@@ -5,7 +5,7 @@ using Unity.Netcode.Components; // Si usas NetworkRigidbody/Transform
 [RequireComponent(typeof(NetworkObject))]
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(Collider))]
-// Asegúrate de tener NetworkRigidbody O NetworkTransform, no ambos. NetworkRigidbody es mejor para físicas puras del servidor.
+// Asegï¿½rate de tener NetworkRigidbody O NetworkTransform, no ambos. NetworkRigidbody es mejor para fï¿½sicas puras del servidor.
 [RequireComponent(typeof(NetworkRigidbody))]
 public class Bullet : NetworkBehaviour
 {
@@ -13,13 +13,13 @@ public class Bullet : NetworkBehaviour
     [SerializeField] private int damage = 10;
     [SerializeField] private float lifeTime = 5.0f; // Tiempo antes de autodestruirse si no choca
 
-    // Información establecida por el servidor ANTES de hacer Spawn()
+    // Informaciï¿½n establecida por el servidor ANTES de hacer Spawn()
     private ulong ownerClientId;
     private Color bulletColor;
     private GameObject impactEffectPrefab; // Pasado desde el jugador
 
     private Rigidbody rb;
-    private bool hitDetected = false; // Para evitar múltiples colisiones/efectos
+    private bool hitDetected = false; // Para evitar mï¿½ltiples colisiones/efectos
 
     public override void OnNetworkSpawn()
     {
@@ -28,28 +28,28 @@ public class Bullet : NetworkBehaviour
         // Collider col = GetComponent<Collider>();
         // if (!IsServer && col != null) col.isTrigger = true; // O manejar colisiones solo en servidor
 
-        // Aplicar color (ya que NetworkVariable no se usa aquí para el color)
+        // Aplicar color (ya que NetworkVariable no se usa aquï¿½ para el color)
         GetComponent<Renderer>().material.color = bulletColor;
 
-        // Autodestrucción después de lifeTime (solo el servidor necesita destruirlo en red)
+        // Autodestrucciï¿½n despuï¿½s de lifeTime (solo el servidor necesita destruirlo en red)
         if (IsServer)
         {
             Invoke(nameof(DestroySelf), lifeTime);
         }
 
         // Si usamos NetworkRigidbody, la velocidad se aplica en Initialize y se sincroniza.
-        // Si usáramos NetworkTransform, tendríamos que moverlo en Update() en el servidor.
+        // Si usï¿½ramos NetworkTransform, tendrï¿½amos que moverlo en Update() en el servidor.
     }
 
-    // Llamado por Player.cs en el servidor DESPUÉS de Instantiate, ANTES de Spawn()
+    // Llamado por Player.cs en el servidor DESPUï¿½S de Instantiate, ANTES de Spawn()
     public void Initialize(ulong ownerId, Color color, GameObject impactFxPrefab)
     {
         ownerClientId = ownerId;
         bulletColor = color;
         impactEffectPrefab = impactFxPrefab;
 
-        // Aplicar velocidad inicial (NetworkRigidbody la sincronizará)
-        GetComponent<Rigidbody>().velocity = transform.forward * speed;
+        // Aplicar velocidad inicial (NetworkRigidbody la sincronizarï¿½)
+        GetComponent<Rigidbody>().linearVelocity = transform.forward * speed;
 
          // Aplicar color inmediatamente (antes de spawn)
          var renderer = GetComponent<Renderer>();
@@ -60,18 +60,18 @@ public class Bullet : NetworkBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        // La lógica de colisión REAL solo debe ejecutarse en el servidor
+        // La lï¿½gica de colisiï¿½n REAL solo debe ejecutarse en el servidor
         if (!IsServer || hitDetected) return;
 
         HandleCollision(collision.gameObject, collision.contacts[0].point, collision.contacts[0].normal);
     }
 
      private void OnTriggerEnter(Collider other) {
-         // OnTriggerEnter puede ser útil si los colliders de los jugadores son triggers
+         // OnTriggerEnter puede ser ï¿½til si los colliders de los jugadores son triggers
          // o si la bala es un trigger en los clientes.
          if (!IsServer || hitDetected) return;
 
-         // Simplificación: Asumimos que el punto de impacto es el centro del otro collider
+         // Simplificaciï¿½n: Asumimos que el punto de impacto es el centro del otro collider
          HandleCollision(other.gameObject, other.transform.position, (transform.position - other.transform.position).normalized);
      }
 
@@ -81,7 +81,7 @@ public class Bullet : NetworkBehaviour
 
         hitDetected = true; // Marcar que ya hemos colisionado
 
-        Debug.Log($"Bala (Servidor): Colisión detectada con {hitObject.name}");
+        Debug.Log($"Bala (Servidor): Colisiï¿½n detectada con {hitObject.name}");
 
         // Intentar obtener el componente Player del objeto golpeado
         Player hitPlayer = hitObject.GetComponent<Player>();
@@ -89,14 +89,14 @@ public class Bullet : NetworkBehaviour
         // Comprobar si es un jugador y NO es el propietario de la bala
         if (hitPlayer != null && hitPlayer.OwnerClientId != ownerClientId)
         {
-            Debug.Log($"Bala (Servidor): Golpeó al jugador {hitPlayer.OwnerClientId}. Aplicando daño.");
-            // Aplicar daño al jugador (el método TakeDamage ya verifica si es servidor)
+            Debug.Log($"Bala (Servidor): Golpeï¿½ al jugador {hitPlayer.OwnerClientId}. Aplicando daï¿½o.");
+            // Aplicar daï¿½o al jugador (el mï¿½todo TakeDamage ya verifica si es servidor)
             hitPlayer.TakeDamage(damage);
         }
         else if (hitPlayer != null && hitPlayer.OwnerClientId == ownerClientId)
         {
-            Debug.Log($"Bala (Servidor): Golpeó al propio dueño ({ownerClientId}). Ignorando daño.");
-            // No hacer nada si choca con el dueño (o aplicar lógica diferente si se quiere)
+            Debug.Log($"Bala (Servidor): Golpeï¿½ al propio dueï¿½o ({ownerClientId}). Ignorando daï¿½o.");
+            // No hacer nada si choca con el dueï¿½o (o aplicar lï¿½gica diferente si se quiere)
         }
 
         // Notificar a los clientes para que creen el efecto de impacto
@@ -110,7 +110,7 @@ public class Bullet : NetworkBehaviour
     {
         if (!IsServer) return; // Solo el servidor destruye
 
-        // Cancelar Invoke si se destruye antes por colisión
+        // Cancelar Invoke si se destruye antes por colisiï¿½n
         CancelInvoke(nameof(DestroySelf));
 
         if (NetworkObject != null && NetworkObject.IsSpawned)
@@ -120,8 +120,8 @@ public class Bullet : NetworkBehaviour
         }
         else
         {
-            Debug.LogWarning("Bala (Servidor): Intentando destruir pero no está spawneada o no tiene NetworkObject.");
-            // Destroy(gameObject); // Destrucción local si algo falló
+            Debug.LogWarning("Bala (Servidor): Intentando destruir pero no estï¿½ spawneada o no tiene NetworkObject.");
+            // Destroy(gameObject); // Destrucciï¿½n local si algo fallï¿½
         }
     }
 
@@ -135,7 +135,7 @@ public class Bullet : NetworkBehaviour
         if (impactEffectPrefab != null)
         {
             GameObject effect = Instantiate(impactEffectPrefab, position, Quaternion.LookRotation(normal));
-            // Destruir el efecto después de un tiempo
+            // Destruir el efecto despuï¿½s de un tiempo
             Destroy(effect, 2.0f);
         }
         else

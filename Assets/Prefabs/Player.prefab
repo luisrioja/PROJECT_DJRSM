@@ -35,7 +35,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 6855597806104714708}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &2245684602209204444
@@ -150,19 +151,19 @@ MonoBehaviour:
   healthBarPrefab: {fileID: 0}
   healthBarAnchor: {fileID: 0}
   playerMeshRenderer: {fileID: 0}
-  firePoint: {fileID: 0}
-  bulletPrefab: {fileID: 0}
+  firePoint: {fileID: 6855597806104714708}
+  bulletPrefab: {fileID: 1977768967006135689, guid: b9ba0f6d8cc072349804939205ecf2aa, type: 3}
   bulletImpactEffectPrefab: {fileID: 0}
   deathEffectPrefab: {fileID: 0}
   dashEffectPrefab: {fileID: 0}
   moveSpeed: 5
   maxHealth: 100
-  deadColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  deadColor: {r: 0.990566, g: 0, b: 0, a: 1}
   fireRate: 0.5
   interactionRadius: 2
   interactableLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 8
   powerUpDuration: 10
   speedBoostMultiplier: 1.5
   fireRateBoostMultiplier: 2
@@ -236,3 +237,34 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!1 &6041398412457335808
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6855597806104714708}
+  m_Layer: 0
+  m_Name: FirePoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6855597806104714708
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6041398412457335808}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.742, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7493450710732663834}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
