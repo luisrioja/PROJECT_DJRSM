@@ -128,7 +128,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2438038577
+  GlobalObjectIdHash: 3192892376
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -157,9 +157,9 @@ MonoBehaviour:
   bulletImpactEffectPrefab: {fileID: 0}
   deathEffectPrefab: {fileID: 0}
   dashEffectPrefab: {fileID: 0}
-  moveSpeed: 5
+  moveSpeed: 2
   maxHealth: 100
-  deadColor: {r: 0.14150941, g: 0.14150941, b: 0.14150941, a: 1}
+  deadColor: {r: 1, g: 0, b: 0, a: 1}
   fireRate: 0.5
   interactionRadius: 2
   interactableLayer:

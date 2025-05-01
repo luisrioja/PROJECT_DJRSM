@@ -72,10 +72,9 @@ public class Player : NetworkBehaviour
     private float baseMoveSpeed;
     private float baseFireRate;
 
-    // --- Propiedades Públicas (Getters) --- NEW/VERIFIED
+    // --- Propiedades Públicas (Getters) ---
     public int MaxHealth => maxHealth;
     public int HealthBoostAmount => healthBoostAmount;
-    // public float PowerUpDuration => powerUpDuration; // Si otros scripts necesitan saber la duración
 
     // Estructura simple para seguir powerups activos localmente
     private struct ActivePowerUp {
@@ -90,7 +89,6 @@ public class Player : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        // Debug.Log($"Player Spawned. Owner: {OwnerClientId}, IsOwner: {IsOwner}, IsServer: {IsServer}");
         rb = GetComponent<Rigidbody>();
         if (rb == null) Debug.LogError("Player necesita un Rigidbody.");
         if (playerMeshRenderer == null) Debug.LogWarning("Asignar Player Mesh Renderer en Inspector para cambios de color.");
@@ -133,8 +131,13 @@ public class Player : NetworkBehaviour
         // Input Disparo
         if (Input.GetButton("Fire1") && Time.time >= nextFireTime)
         {
-            nextFireTime = Time.time + fireRate;
-            SubmitFireRequestServerRpc(firePoint.position, firePoint.rotation);
+            nextFireTime = Time.time + fireRate; // Cooldown local rápido
+            // Comprobar si firePoint está asignado antes de usarlo
+            if (firePoint != null) {
+                SubmitFireRequestServerRpc(firePoint.position, firePoint.rotation);
+            } else {
+                Debug.LogError($"Jugador {OwnerClientId}: Fire Point no está asignado en el Inspector.");
+            }
         }
 
         // Input Interacción
@@ -164,7 +167,6 @@ public class Player : NetworkBehaviour
     // =================================================
     // --- SECCIÓN: Configuración Inicial y UI Local ---
     // =================================================
-    // (SetupLocalUI, SetupFloatingHealthBar, VerifyNetworkTransformConfig - Sin cambios)
     private void SetupLocalUI()
     {
         var vidaPlayerObject = GameObject.Find("VidaPlayer");
@@ -196,7 +198,6 @@ public class Player : NetworkBehaviour
     // ===============================================
     // --- SECCIÓN: Callbacks de Network Variables ---
     // ===============================================
-    // (OnHealthChanged, ColorChanged, OnIsDeadChanged - Sin cambios relevantes, solo limpieza menor)
      private void OnHealthChanged(int previousValue, int newValue)
     {
         if (IsOwner) UpdateLocalHealthUI(newValue);
@@ -216,8 +217,19 @@ public class Player : NetworkBehaviour
         if (playerMeshRenderer != null)
             playerMeshRenderer.material.color = newValue ? deadColor : NetworkColor.Value;
 
-        GetComponent<Collider>().enabled = !newValue;
-        if (playerMeshRenderer != null) playerMeshRenderer.enabled = !newValue || IsOwner;
+        // --- Corrección Muerte/Caída ---
+        //GetComponent<Collider>().enabled = !newValue; // No desactivar collider principal
+        if (rb != null) {
+            rb.isKinematic = newValue; // Hacer kinemático al morir
+            if (newValue) { // Si muere
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            } else if (IsServer) { // Si revive (y somos servidor)
+                rb.isKinematic = false; // Restaurar física si el servidor no es kinemático por defecto
+            }
+        }
+        // --- Fin Corrección ---
+
         if (healthBarInstance != null) healthBarInstance.SetActive(!newValue);
 
         if (justDied) {
@@ -231,17 +243,19 @@ public class Player : NetworkBehaviour
                  Debug.Log("¡Has Muerto!");
                  StopAllPowerupCoroutinesAndVisuals();
             }
+             // --- Corrección Muerte/Respawn ---
+             // No iniciar respawn automático aquí para poder ver al muerto
+             // StartCoroutine(RespawnTimer(5.0f));
+             // --- Fin Corrección ---
         }
     }
 
     // ===========================================
     // --- SECCIÓN: Actualización de UI / Visual ---
     // ===========================================
-    // (UpdateLocalHealthUI, UpdateFloatingHealthBar - Sin cambios)
     private void UpdateLocalHealthUI(int currentHealth) {
         if (textoVida != null) textoVida.text = "HEALTH: " + currentHealth.ToString();
     }
-
     private void UpdateFloatingHealthBar(int currentHealth) {
         if (healthBarSlider != null) healthBarSlider.value = (float)currentHealth / maxHealth;
         if (healthBarInstance != null) healthBarInstance.SetActive(currentHealth > 0 && !IsDead.Value);
@@ -250,157 +264,243 @@ public class Player : NetworkBehaviour
     // ============================================
     // --- SECCIÓN: Server RPCs (Cliente llama) ---
     // ============================================
-    // (RequestInitialDataServerRpc, SubmitMovementRequestServerRpc, SubmitFireRequestServerRpc, SubmitInteractionRequestServerRpc, SubmitDashRequestServerRpc - Sin cambios funcionales)
-    [ServerRpc] private void RequestInitialDataServerRpc(ServerRpcParams rpcParams = default) { /* ... requiere GameManager ... */ }
-    [ServerRpc] void SubmitMovementRequestServerRpc(Vector3 direction, ServerRpcParams rpcParams = default) { if (IsDead.Value) return; transform.Translate(direction * moveSpeed * Time.deltaTime, Space.World); }
-    [ServerRpc] void SubmitFireRequestServerRpc(Vector3 spawnPos, Quaternion spawnRot, ServerRpcParams rpcParams = default) { if (IsDead.Value) return; /* ... requiere Bullet.cs ... */ }
-    [ServerRpc] void SubmitInteractionRequestServerRpc(ServerRpcParams rpcParams = default) { if (IsDead.Value) return; /* ... requiere Door.cs ... */ }
-    [ServerRpc] void SubmitDashRequestServerRpc(Vector3 direction) { if (IsDead.Value || isDashing) return; StartCoroutine(PerformDashServer(direction)); NotifyDashClientRpc(direction); }
 
+    [ServerRpc]
+    private void RequestInitialDataServerRpc(ServerRpcParams rpcParams = default)
+    {
+        ulong clientId = rpcParams.Receive.SenderClientId;
+        Debug.Log($"Servidor: Recibida llamada  RequestInitialDataServerRpc de {clientId}. GameManager se encarga de la asignación inicial.");
+    }
+
+    [ServerRpc]
+    void SubmitMovementRequestServerRpc(Vector3 direction, ServerRpcParams rpcParams = default)
+    {
+        if (IsDead.Value) return;
+        transform.Translate(direction * moveSpeed * Time.deltaTime, Space.World);
+    }
+
+    
+    [ServerRpc]
+    void SubmitFireRequestServerRpc(Vector3 spawnPos, Quaternion spawnRot, ServerRpcParams rpcParams = default)
+    {
+        if (IsDead.Value) return; // Ignorar si muerto
+        ulong clientId = rpcParams.Receive.SenderClientId;
+
+        // Aquí puedes añadir una comprobación de cooldown más estricta en el servidor si es necesario
+
+        if (bulletPrefab != null)
+        {
+            GameObject bulletInstance = Instantiate(bulletPrefab, spawnPos, spawnRot);
+            NetworkObject bulletNetworkObject = bulletInstance.GetComponent<NetworkObject>();
+            Bullet bulletScript = bulletInstance.GetComponent<Bullet>();
+
+            if (bulletNetworkObject != null && bulletScript != null)
+            {
+                // Determinar el color actual del jugador (podría estar afectado por estado de muerte, aunque isDead ya se comprueba)
+                Color jugadorColorActual = playerMeshRenderer != null ? playerMeshRenderer.material.color : NetworkColor.Value;
+                if (IsDead.Value) jugadorColorActual = deadColor; // Asegurar que si dispara justo al morir (difícil), la bala sea gris
+
+                // Inicializar la bala ANTES de hacerla visible en red
+                bulletScript.Initialize(OwnerClientId, jugadorColorActual, bulletImpactEffectPrefab);
+
+                // Hacer spawn de la bala en la red (el servidor se vuelve propietario)
+                bulletNetworkObject.Spawn(true); // true para que se destruya si el servidor se detiene
+                Debug.Log($"Servidor: Bala spawneada para {clientId}");
+            }
+            else
+            {
+                 Debug.LogError($"Prefab de bala ({bulletPrefab.name}) no tiene NetworkObject o Bullet script.");
+                 Destroy(bulletInstance); // Limpiar instancia fallida
+            }
+        }
+        else
+        {
+             Debug.LogError($"Player {clientId}: Prefab de bala no asignado en el Inspector.");
+        }
+    }
+    // --- FIN LÓGICA DE DISPARO ---
+
+    [ServerRpc]
+    void SubmitInteractionRequestServerRpc(ServerRpcParams rpcParams = default)
+    {
+        if (IsDead.Value) return;
+        Debug.Log($"Servidor: Jugador {OwnerClientId} intentó interactuar.");
+
+        Collider[] hits = Physics.OverlapSphere(transform.position, interactionRadius, interactableLayer);
+        GameObject closestInteractable = null;
+        float minDistance = float.MaxValue;
+
+        foreach (var hitCollider in hits)
+        {
+            Door door = hitCollider.GetComponent<Door>();
+            if (door != null)
+            {
+                // Simplificación sin Raycast por ahora, si está en el radio y capa, interactúa
+                float distance = Vector3.Distance(transform.position, hitCollider.transform.position);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestInteractable = hitCollider.gameObject;
+                }
+                // Descomentar y ajustar bloque Raycast si se quiere visibilidad estricta
+                /*
+                 RaycastHit visibilityHit;
+                 Vector3 directionToDoor = (hitCollider.transform.position - transform.position).normalized;
+                 Vector3 rayOrigin = transform.position + Vector3.up * 0.5f; // Origen ligeramente elevado
+
+                 if (Physics.Raycast(rayOrigin, directionToDoor, out visibilityHit, interactionRadius * 1.1f))
+                 {
+                     if (visibilityHit.collider == hitCollider) // ¿Realmente vemos la puerta?
+                     {
+                          if (distance < minDistance) { // 'distance' ya calculado arriba
+                              minDistance = distance;
+                              closestInteractable = hitCollider.gameObject;
+                          }
+                     } // else { Debug.Log($"Servidor: Raycast golpeó {visibilityHit.collider.name} en lugar de {hitCollider.name}"); }
+                 } // else { Debug.Log($"Servidor: Raycast hacia {hitCollider.name} no golpeó nada."); }
+                */
+            }
+        }
+
+        if (closestInteractable != null)
+        {
+            Debug.Log($"Servidor: Jugador {OwnerClientId} interactuando con {closestInteractable.name}");
+            Door doorToToggle = closestInteractable.GetComponent<Door>();
+            if (doorToToggle != null) {
+                doorToToggle.ToggleDoorState(); // Llama al método en Door.cs
+            }
+        } // else { Debug.Log($"Servidor: Jugador {OwnerClientId} no encontró nada con qué interactuar."); }
+    }
+
+    [ServerRpc]
+    void SubmitDashRequestServerRpc(Vector3 direction)
+    {
+        if (IsDead.Value || isDashing) return;
+        StartCoroutine(PerformDashServer(direction));
+        NotifyDashClientRpc(direction);
+    }
 
     // ===========================================
     // --- SECCIÓN: Client RPCs (Servidor llama) ---
     // ===========================================
-    // (TeleportClientRpc, NotifyDashClientRpc - Sin cambios)
-    // (NotifyPowerUpPickupClientRpc - Movido a Lógica PowerUp)
-    [ClientRpc] private void TeleportClientRpc(Vector3 position, ClientRpcParams rpcParams = default) { if (!IsOwner) return; transform.position = position; }
-    [ClientRpc] void NotifyDashClientRpc(Vector3 direction) { if (dashEffectPrefab != null) { GameObject fx = Instantiate(dashEffectPrefab, transform.position, Quaternion.LookRotation(direction)); Destroy(fx, 1.0f); } }
-
-    // ========================================
-    // --- SECCIÓN: Lógica de Juego (Vida) ---
-    // ========================================
-    // (TakeDamage, Die, RespawnTimer, Respawn, QuitarVida - Sin cambios funcionales)
-    public void TakeDamage(int amount) { if (!IsServer || IsDead.Value || isDashing) return; int prev = NetworkSalud.Value; NetworkSalud.Value = Mathf.Max(0, NetworkSalud.Value - amount); if (NetworkSalud.Value <= 0 && prev > 0) Die(); }
-    private void Die() { if (!IsServer || IsDead.Value) return; IsDead.Value = true; /* ... lógica server muerte ... */ StartCoroutine(RespawnTimer(5.0f)); } // Ejemplo respawn
-    private IEnumerator RespawnTimer(float delay) { yield return new WaitForSeconds(delay); Respawn(); }
-    private void Respawn() { if (!IsServer) return; Vector3 spawnPos = Vector3.up; /* ... obtener spawn de GameManager ... */ transform.position = spawnPos; NetworkSalud.Value = maxHealth; IsDead.Value = false; }
-    public void QuitarVida(int cantidad) { TakeDamage(cantidad); } // Para compatibilidad HUD
-
-    // ===========================================
-    // --- SECCIÓN: Lógica de Power-Ups ---
-    // ===========================================
-
-    // --- MÉTODO PÚBLICO LLAMADO POR PowerUp.cs EN EL SERVIDOR --- NEW
-    public void ServerHandlePowerUpPickup(PowerUpType type)
+    [ClientRpc]
+    private void TeleportClientRpc(Vector3 position, ClientRpcParams rpcParams = default)
     {
-        if (!IsServer || IsDead.Value) return; // Solo servidor y si no está muerto
-
-        Debug.Log($"Player (Servidor): Procesando recogida de {type} para {OwnerClientId}");
-        // 1. Aplicar efecto lógico en el servidor (incluye corutina si dura)
-        ApplyPowerUpEffectOnServer(type);
-        // 2. Notificar SOLO al cliente propietario para efectos locales y feedback
-        NotifyPowerUpPickupClientRpc(type, new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } } });
+        if (!IsOwner) return;
+        transform.position = position;
     }
-
-    // Aplica la lógica del powerup EN EL SERVIDOR
-    private void ApplyPowerUpEffectOnServer(PowerUpType type)
+    [ClientRpc]
+    void NotifyDashClientRpc(Vector3 direction)
     {
-        if (!IsServer) return;
-
-        switch (type)
-        {
-            case PowerUpType.Speed:
-                StartCoroutine(ServerPowerUpDuration(type, powerUpDuration));
-                break;
-            case PowerUpType.FireRate:
-                StartCoroutine(ServerPowerUpDuration(type, powerUpDuration));
-                break;
-            case PowerUpType.Health:
-                // Accede a sus propias variables miembro directamente
-                NetworkSalud.Value = Mathf.Min(maxHealth, NetworkSalud.Value + healthBoostAmount);
-                break;
-        }
-    }
-
-    // Corutina del SERVIDOR para manejar la duración de Speed/FireRate
-    private IEnumerator ServerPowerUpDuration(PowerUpType type, float duration)
-    {
-        // Aplicar efecto en servidor
-        float originalValue = 0;
-        switch (type)
-        {
-            case PowerUpType.Speed: originalValue = moveSpeed; moveSpeed = baseMoveSpeed * speedBoostMultiplier; break;
-            case PowerUpType.FireRate: originalValue = fireRate; fireRate = baseFireRate / fireRateBoostMultiplier; break;
-        }
-        Debug.Log($"Player (Servidor): Efecto {type} activado para {OwnerClientId}.");
-
-        yield return new WaitForSeconds(duration);
-
-        // Revertir efecto en servidor
-        switch (type)
-        {
-            case PowerUpType.Speed: moveSpeed = baseMoveSpeed; break; // Revertir a base
-            case PowerUpType.FireRate: fireRate = baseFireRate; break; // Revertir a base
-        }
-         Debug.Log($"Player (Servidor): Efecto {type} expirado para {OwnerClientId}.");
+        if (dashEffectPrefab != null) { GameObject fx = Instantiate(dashEffectPrefab, transform.position, Quaternion.LookRotation(direction)); Destroy(fx, 1.0f); }
     }
 
     // RPC para notificar al cliente propietario que recogió un powerup
     [ClientRpc]
     private void NotifyPowerUpPickupClientRpc(PowerUpType type, ClientRpcParams clientRpcParams = default)
     {
-        // El RPC se envía solo al cliente target, así que no necesitamos comprobar IsOwner aquí explícitamente
         Debug.Log($"Player (Cliente): Recibí notificación de recogida de {type}!");
-        // Iniciar efectos locales (visuales, UI, sonido, corutina de duración local)
         StartCoroutine(HandlePowerUpEffectLocal(type));
     }
 
-    // Corutina del CLIENTE para manejar efectos locales (visuales, stats locales)
-    private IEnumerator HandlePowerUpEffectLocal(PowerUpType type)
+
+    // ========================================
+    // --- SECCIÓN: Lógica de Juego (Vida) ---
+    // ========================================
+    public void TakeDamage(int amount)
     {
-        Debug.Log($"Player (Cliente): Aplicando efecto local para {type}");
-        GameObject visualEffectInstance = null;
-        float currentDuration = powerUpDuration;
-
-        // Aplicar efecto VISUAL y de STATS localmente (para feedback inmediato)
-        switch (type)
-        {
-            case PowerUpType.Speed:
-                // moveSpeed = baseMoveSpeed * speedBoostMultiplier; // El servidor controla el movimiento real
-                if (speedEffectVisual != null) speedEffectVisual.SetActive(true);
-                visualEffectInstance = speedEffectVisual;
-                break;
-            case PowerUpType.FireRate:
-                // fireRate = baseFireRate / fireRateBoostMultiplier; // El servidor controla cooldown real
-                 if (fireRateEffectVisual != null) fireRateEffectVisual.SetActive(true);
-                 visualEffectInstance = fireRateEffectVisual;
-                break;
-            case PowerUpType.Health:
-                 // El valor ya se actualizó vía NetworkVariable. Mostrar efecto instantáneo si hay.
-                 Debug.Log("Player (Cliente): Efecto de vida ya aplicado por NetworkVariable.");
-                 currentDuration = 0; // No necesita corutina de duración para el stat
-                break;
-        }
-
-         // Añadir a la lista de activos para revertir LUEGO VISUALES locales
-         ActivePowerUp newActivePowerUp = new ActivePowerUp { Type = type, VisualEffect = visualEffectInstance };
-         // Solo iniciar corrutina de expiración si hay duración y/o efecto visual
-         if (currentDuration > 0 || visualEffectInstance != null)
-         {
-             Coroutine expiry = StartCoroutine(RevertPowerUpEffectLocal(type, currentDuration, newActivePowerUp));
-             newActivePowerUp.ExpiryCoroutine = expiry;
-             activePowerUps.Add(newActivePowerUp);
-         }
-
-        yield return null; // Necesario si no hubo yield break antes
+        if (!IsServer || IsDead.Value || isDashing) return;
+        int prev = NetworkSalud.Value;
+        NetworkSalud.Value = Mathf.Max(0, NetworkSalud.Value - amount);
+        if (NetworkSalud.Value <= 0 && prev > 0) Die();
     }
 
-    // Corutina del CLIENTE para revertir efectos VISUALES locales
+    private void Die()
+    {
+        if (!IsServer || IsDead.Value) return;
+        IsDead.Value = true; // Sincroniza estado, dispara OnIsDeadChanged
+        Debug.Log($"Servidor: Jugador {OwnerClientId} ha muerto.");
+        // --- Corrección Muerte/Respawn ---
+        // StartCoroutine(RespawnTimer(5.0f)); // No respawnear automáticamente
+        // --- Fin Corrección ---
+    }
+
+    // Dejar RespawnTimer y Respawn por si se implementa un respawn manual más tarde
+    private IEnumerator RespawnTimer(float delay) { yield return new WaitForSeconds(delay); Respawn(); }
+    private void Respawn() {
+        if (!IsServer) return;
+        Debug.Log($"Servidor: Respawneando jugador {OwnerClientId}");
+        Vector3 spawnPos = Vector3.up; // Default
+        GameManager gm = GameManager.Instance; // Asume Singleton
+        if (gm != null) spawnPos = gm.GetRandomSpawnPoint(); // Necesitas este método en GameManager
+        transform.position = spawnPos;
+        NetworkSalud.Value = maxHealth;
+        IsDead.Value = false; // Esto dispara OnIsDeadChanged para revertir estado visual/físico
+    }
+
+    public void QuitarVida(int cantidad) { TakeDamage(cantidad); } // Para compatibilidad HUD
+
+
+    // ===========================================
+    // --- SECCIÓN: Lógica de Power-Ups ---
+    // ===========================================
+    public void ServerHandlePowerUpPickup(PowerUpType type)
+    {
+        if (!IsServer || IsDead.Value) return;
+        ApplyPowerUpEffectOnServer(type);
+        NotifyPowerUpPickupClientRpc(type, new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } } });
+    }
+
+    private void ApplyPowerUpEffectOnServer(PowerUpType type)
+    {
+        if (!IsServer) return;
+        switch (type) {
+            case PowerUpType.Speed: StartCoroutine(ServerPowerUpDuration(type, powerUpDuration)); break;
+            case PowerUpType.FireRate: StartCoroutine(ServerPowerUpDuration(type, powerUpDuration)); break;
+            case PowerUpType.Health: NetworkSalud.Value = Mathf.Min(maxHealth, NetworkSalud.Value + healthBoostAmount); break;
+        }
+    }
+
+    private IEnumerator ServerPowerUpDuration(PowerUpType type, float duration)
+    {
+        float originalValue = 0; // Necesario declararlo fuera del switch si se usa después
+        switch (type) {
+            case PowerUpType.Speed: originalValue = moveSpeed; moveSpeed = baseMoveSpeed * speedBoostMultiplier; break;
+            case PowerUpType.FireRate: originalValue = fireRate; fireRate = baseFireRate / fireRateBoostMultiplier; break;
+        }
+        Debug.Log($"Player (Servidor): Efecto {type} activado para {OwnerClientId}.");
+        yield return new WaitForSeconds(duration);
+        switch (type) { // Revertir usando valores base
+            case PowerUpType.Speed: moveSpeed = baseMoveSpeed; break;
+            case PowerUpType.FireRate: fireRate = baseFireRate; break;
+        }
+         Debug.Log($"Player (Servidor): Efecto {type} expirado para {OwnerClientId}.");
+    }
+
+    private IEnumerator HandlePowerUpEffectLocal(PowerUpType type)
+    {
+        GameObject visualEffectInstance = null; float currentDuration = powerUpDuration;
+        switch (type) {
+            case PowerUpType.Speed: if (speedEffectVisual != null) speedEffectVisual.SetActive(true); visualEffectInstance = speedEffectVisual; break;
+            case PowerUpType.FireRate: if (fireRateEffectVisual != null) fireRateEffectVisual.SetActive(true); visualEffectInstance = fireRateEffectVisual; break;
+            case PowerUpType.Health: currentDuration = 0; break; // Instantáneo
+        }
+        ActivePowerUp newActivePowerUp = new ActivePowerUp { Type = type, VisualEffect = visualEffectInstance };
+        if (currentDuration > 0 || visualEffectInstance != null) {
+            Coroutine expiry = StartCoroutine(RevertPowerUpEffectLocal(type, currentDuration, newActivePowerUp));
+            newActivePowerUp.ExpiryCoroutine = expiry; activePowerUps.Add(newActivePowerUp);
+        }
+        yield return null;
+    }
+
     private IEnumerator RevertPowerUpEffectLocal(PowerUpType type, float duration, ActivePowerUp trackingInfo)
     {
         if (duration > 0) yield return new WaitForSeconds(duration);
-
-        Debug.Log($"Player (Cliente): Revirtiendo efecto local para {type}");
-        // Revertir STATS locales (generalmente no necesario ya que el servidor manda)
-        // Revertir efecto VISUAL local
         if (trackingInfo.VisualEffect != null) trackingInfo.VisualEffect.SetActive(false);
-
         activePowerUps.Remove(trackingInfo);
     }
 
-     // Detiene corutinas y efectos visuales locales al morir, etc.
      private void StopAllPowerupCoroutinesAndVisuals() {
-         if (!IsOwner) return; // Solo el propietario gestiona esto localmente
+         if (!IsOwner) return;
          foreach(var powerup in activePowerUps) {
              if (powerup.VisualEffect != null) powerup.VisualEffect.SetActive(false);
              if (powerup.ExpiryCoroutine != null) StopCoroutine(powerup.ExpiryCoroutine);
@@ -408,17 +508,36 @@ public class Player : NetworkBehaviour
          activePowerUps.Clear();
      }
 
+
     // =====================================================
     // --- SECCIÓN: Lógica de Mecánica Nueva (Dash Server) ---
     // =====================================================
-    // (PerformDashServer - Sin cambios funcionales)
     private IEnumerator PerformDashServer(Vector3 direction) {
          if (!IsServer) yield break;
          isDashing = true;
          bool originalGravity = rb.useGravity; rb.useGravity = false;
          float elapsedTime = 0f; Vector3 startPos = transform.position; Vector3 targetPos = transform.position + direction * dashDistance;
-         RaycastHit hit; if (Physics.Raycast(startPos, direction, out hit, dashDistance)) targetPos = hit.point - direction * 0.1f;
-         while (elapsedTime < dashDuration) { transform.Translate(direction * (dashDistance / dashDuration) * Time.deltaTime, Space.World); elapsedTime += Time.deltaTime; yield return null; }
-         rb.linearVelocity = Vector3.zero; rb.useGravity = originalGravity; isDashing = false;
+         RaycastHit hit; if (Physics.Raycast(startPos, direction, out hit, dashDistance)) targetPos = hit.point - direction * 0.1f; // Ajustar posición si choca
+         Vector3 velocity = direction * (dashDistance / dashDuration); // Calcular velocidad constante para el dash
+
+         while (elapsedTime < dashDuration) {
+            // Mover usando Rigidbody si quieres interacción física durante el dash, o Translate si quieres movimiento más directo.
+            // rb.velocity = velocity; // Opción física
+            transform.Translate(velocity * Time.deltaTime, Space.World); // Opción directa
+
+            // Salir si choca durante el movimiento (opcional, si no se usó raycast antes)
+            // RaycastHit midDashHit;
+            // if(Physics.Raycast(transform.position, direction, out midDashHit, velocity.magnitude * Time.deltaTime * 1.1f)) {
+            //     transform.position = midDashHit.point - direction * 0.1f;
+            //     break; // Detener dash
+            // }
+
+            elapsedTime += Time.deltaTime;
+            yield return null;
+         }
+
+         rb.linearVelocity = Vector3.zero; // Detener movimiento al final
+         rb.useGravity = originalGravity;
+         isDashing = false;
     }
 }
