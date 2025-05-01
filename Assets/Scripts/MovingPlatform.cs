@@ -12,7 +12,7 @@ public class MovingPlatform : NetworkBehaviour
     [SerializeField] private List<Transform> waypoints = new List<Transform>(); // Puntos a seguir
     [SerializeField] private float speed = 2.0f;
     [SerializeField] private float waitTimeAtPoint = 1.0f; // Tiempo de espera en cada waypoint
-    [SerializeField] private bool loop = true; // ¿Vuelve al inicio al final?
+    [SerializeField] private bool loop = true; 
 
     // Estado gestionado por el servidor
     private int currentWaypointIndex = 0;
@@ -127,32 +127,5 @@ public class MovingPlatform : NetworkBehaviour
     }
 
 
-    // --- Hacer que los jugadores se muevan con la plataforma ---
-    // El collider de este objeto NO debe ser Trigger
-    private void OnCollisionEnter(Collision collision)
-    {
-        // Si un jugador colisiona desde arriba (o lado), hacerlo hijo
-        Player player = collision.gameObject.GetComponent<Player>();
-        if (player != null)
-        {
-             // Comprobar si la colisión es razonablemente desde arriba
-             ContactPoint contact = collision.contacts[0];
-             if (Vector3.Dot(contact.normal, Vector3.down) > 0.7f) // Si la normal del punto de contacto apunta mayormente hacia abajo (colisión desde arriba)
-             {
-                Debug.Log($"Plataforma: Haciendo hijo al jugador {player.OwnerClientId}");
-                player.transform.SetParent(transform, true); // true para mantener world position
-             }
-        }
-    }
 
-    private void OnCollisionExit(Collision collision)
-    {
-        // Si un jugador deja de colisionar, quitarlo como hijo
-         Player player = collision.gameObject.GetComponent<Player>();
-        if (player != null && player.transform.parent == transform) // Asegurarse que era hijo nuestro
-        {
-             Debug.Log($"Plataforma: Quitnado como hijo al jugador {player.OwnerClientId}");
-             player.transform.SetParent(null); // Quitar padre
-        }
-    }
 }

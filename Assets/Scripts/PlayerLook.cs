@@ -7,7 +7,7 @@ public class PlayerLook : MonoBehaviour
     [Tooltip("Referencia al Transform del objeto que contiene la cámara (debe ser hijo del Player)")]
     [SerializeField] private Transform cameraHolder;
     [Tooltip("Sensibilidad del ratón para enviar al servidor")]
-    [SerializeField] private float localMouseSensitivity = 1.0f; // Ya no multiplica por 100 aquí, se hace en servidor
+    [SerializeField] private float localMouseSensitivity = 1.0f; 
 
     // Referencia al script Player principal para llamar al RPC
     private Player playerScript;
@@ -58,8 +58,7 @@ public class PlayerLook : MonoBehaviour
         }
 
         // --- Obtener Input del Mouse (Solo el Dueño) ---
-        // NO multiplicamos por Time.deltaTime aquí, el servidor lo hará para consistencia.
-        // Enviamos el delta "crudo" multiplicado por una sensibilidad local si se desea ajustar la escala del input.
+       
         float mouseX = Input.GetAxis("Mouse X") * localMouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * localMouseSensitivity;
 
@@ -70,14 +69,9 @@ public class PlayerLook : MonoBehaviour
             playerScript.UpdateLookInputServerRpc(mouseX, mouseY);
         }
 
-        // --- IMPORTANTE: Ya NO aplicamos rotación directamente aquí ---
-        // transform.Rotate(Vector3.up * mouseX); // <- ELIMINADO
-        // verticalRotation -= mouseY; // <- ELIMINADO
-        // verticalRotation = Mathf.Clamp(verticalRotation, minVerticalAngle, maxVerticalAngle); // <- ELIMINADO
-        // cameraHolder.localRotation = Quaternion.Euler(verticalRotation, 0f, 0f); // <- ELIMINADO
+    
     }
 
-    // --- NUEVO MÉTODO PÚBLICO ---
     // Este método es llamado por Player.cs (HandleVerticalRotationChanged)
     // cuando la NetworkVariable de rotación vertical cambia.
     public void SetVerticalRotationLocally(float verticalAngle)

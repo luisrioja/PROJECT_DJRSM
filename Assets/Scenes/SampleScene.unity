@@ -395,8 +395,8 @@ MonoBehaviour:
   spawnPoints:
   - {fileID: 1692582972}
   - {fileID: 1879480562}
-  maxPowerUps: 5
-  spawnInterval: 5
+  maxPowerUps: 10
+  spawnInterval: 15
   minSpawnDistance: 2
 --- !u!1 &626120139
 GameObject:
@@ -526,6 +526,38 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+--- !u!1 &782628375
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 782628376}
+  m_Layer: 0
+  m_Name: MapDesign
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &782628376
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 782628375}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.125, y: 0, z: -0.5350001}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1440571321}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &963194225
 GameObject:
   m_ObjectHideFlags: 0
@@ -821,12 +853,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1440571317}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.09, z: 0}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.125, y: -0.09, z: 0.5350001}
   m_LocalScale: {x: 6.3298, y: 6.3298, z: 6.3298}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 782628376}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1624143096
 GameObject:
@@ -961,7 +993,7 @@ Transform:
   m_GameObject: {fileID: 1692582971}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 3.59, y: 0, z: -3.63}
+  m_LocalPosition: {x: 3.59, y: 0.49, z: -3.63}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1023,7 +1055,7 @@ Transform:
   m_GameObject: {fileID: 1879480561}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -3.34, y: 0, z: 2.56}
+  m_LocalPosition: {x: -3.34, y: 0.49, z: 2.56}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1174,17 +1206,13 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 948492046
       objectReference: {fileID: 0}
-    - target: {fileID: 920780783770105583, guid: 6fbf7fb75eb28b34eb752afc076784b1, type: 3}
-      propertyPath: InScenePlacedSourceGlobalObjectIdHash
-      value: 1545971509
-      objectReference: {fileID: 0}
     - target: {fileID: 3504904484623520738, guid: 6fbf7fb75eb28b34eb752afc076784b1, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3504904484623520738, guid: 6fbf7fb75eb28b34eb752afc076784b1, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.22
+      value: 1.55
       objectReference: {fileID: 0}
     - target: {fileID: 3504904484623520738, guid: 6fbf7fb75eb28b34eb752afc076784b1, type: 3}
       propertyPath: m_LocalPosition.z
@@ -1221,10 +1249,6 @@ PrefabInstance:
     - target: {fileID: 8940832220301476891, guid: 6fbf7fb75eb28b34eb752afc076784b1, type: 3}
       propertyPath: m_Name
       value: Door
-      objectReference: {fileID: 0}
-    - target: {fileID: 8940832220301476891, guid: 6fbf7fb75eb28b34eb752afc076784b1, type: 3}
-      propertyPath: m_Layer
-      value: 3
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1460,7 +1484,7 @@ SceneRoots:
   - {fileID: 705507995}
   - {fileID: 8384190821402808537}
   - {fileID: 4260981840547251339}
-  - {fileID: 1440571321}
+  - {fileID: 782628376}
   - {fileID: 2007146155}
   - {fileID: 97790016}
   - {fileID: 1108755352817195826}
