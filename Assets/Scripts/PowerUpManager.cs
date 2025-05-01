@@ -1,88 +1,234 @@
 using UnityEngine;
 using Unity.Netcode;
 using System.Collections;
-using System.Collections.Generic;
+using System.Collections.Generic; // Necesario para List<>
 
-[RequireComponent(typeof(NetworkObject))]
 public class PowerUpManager : NetworkBehaviour
 {
     [Header("Configuración de Spawn")]
-    [SerializeField] private GameObject powerUpPrefab;
-    [SerializeField] private List<Transform> spawnPoints = new List<Transform>();
-    [SerializeField] private float spawnInterval = 15.0f;
-    [SerializeField] private float initialDelay = 5.0f;
-    [SerializeField] private int maxConcurrentPowerUps = 5;
+    [Tooltip("Lista de posibles prefabs de PowerUp a instanciar. Deben tener PowerUp.cs y NetworkObject.")]
+    [SerializeField] private List<GameObject> powerUpPrefabs = new List<GameObject>();
 
+    [Tooltip("Lista de Transforms que marcan las posiciones donde pueden aparecer los PowerUps.")]
+    [SerializeField] private List<Transform> spawnPoints = new List<Transform>();
+
+    [Tooltip("Número máximo de PowerUps activos simultáneamente en el mapa.")]
+    [SerializeField] private int maxPowerUps = 5;
+
+    [Tooltip("Tiempo en segundos entre intentos de spawn de un nuevo PowerUp si hay espacio.")]
+    [SerializeField] private float spawnInterval = 10.0f;
+
+    [Tooltip("Distancia mínima requerida entre un punto de spawn y cualquier PowerUp existente para considerarlo 'libre'.")]
+    [SerializeField] private float minSpawnDistance = 2.0f; // Evita spawns superpuestos
+
+    // Lista interna para rastrear los PowerUps activos (solo en el servidor)
     private List<NetworkObject> activePowerUps = new List<NetworkObject>();
+
+    // =========================================
+    // --- Ciclo de Vida y Red ---
+    // =========================================
 
     public override void OnNetworkSpawn()
     {
-        if (!IsServer) {
-            enabled = false;
-            return;
-        }
-        if (powerUpPrefab == null || spawnPoints.Count == 0) {
-            Debug.LogError("PowerUpManager: Falta prefab o spawn points.");
-            enabled = false;
-            return;
-        }
-        StartCoroutine(SpawnPowerUpsCoroutine());
-    }
-
-    private IEnumerator SpawnPowerUpsCoroutine()
-    {
-        yield return new WaitForSeconds(initialDelay);
-        while (true)
-        {
-            activePowerUps.RemoveAll(item => item == null || !item.IsSpawned);
-            if (activePowerUps.Count < maxConcurrentPowerUps)
-            {
-                SpawnSinglePowerUp();
-            }
-            yield return new WaitForSeconds(spawnInterval);
-        }
-    }
-
-    private void SpawnSinglePowerUp()
-    {
+        // Solo el servidor se encarga de gestionar el spawn de PowerUps.
         if (!IsServer) return;
 
-        int spawnIndex = Random.Range(0, spawnPoints.Count);
-        Transform spawnPoint = spawnPoints[spawnIndex];
-
-        // --- CORRECCIÓN AQUÍ: Quitar Player. ---
-        PowerUpType randomType = (PowerUpType)Random.Range(0, System.Enum.GetValues(typeof(PowerUpType)).Length);
-        // --- FIN CORRECCIÓN ---
-
-        GameObject powerUpInstance = Instantiate(powerUpPrefab, spawnPoint.position, spawnPoint.rotation);
-        NetworkObject powerUpNetworkObject = powerUpInstance.GetComponent<NetworkObject>();
-        PowerUp powerUpScript = powerUpInstance.GetComponent<PowerUp>();
-
-        if (powerUpNetworkObject != null && powerUpScript != null)
+        // --- Validaciones Iniciales ---
+        if (spawnPoints == null || spawnPoints.Count == 0)
         {
-            // --- CORRECCIÓN AQUÍ: Quitar Player. ---
-            powerUpScript.Initialize(randomType); // Initialize tipo
-            // --- FIN CORRECCIÓN ---
-            powerUpNetworkObject.Spawn(true);     // Spawn en red
-            activePowerUps.Add(powerUpNetworkObject); // Add a lista
+            Debug.LogError("PowerUpManager: ¡No hay puntos de spawn ('Spawn Points') asignados en el Inspector!");
+            enabled = false; // Desactivar script si no puede funcionar.
+            return;
+        }
+
+        if (powerUpPrefabs == null || powerUpPrefabs.Count == 0)
+        {
+            Debug.LogError("PowerUpManager: ¡La lista de prefabs de PowerUp ('Power Up Prefabs') está vacía o no asignada!");
+            enabled = false;
+            return;
+        }
+
+        // Validar cada prefab en la lista
+        bool validationFailed = false;
+        for (int i = 0; i < powerUpPrefabs.Count; i++)
+        {
+            GameObject prefab = powerUpPrefabs[i];
+            if (prefab == null)
+            {
+                Debug.LogError($"PowerUpManager: ¡Hay una entrada NULA en la lista 'Power Up Prefabs' en el índice {i}!");
+                validationFailed = true;
+                continue; // Continuar revisando los demás
+            }
+            if (prefab.GetComponent<NetworkObject>() == null)
+            {
+                 Debug.LogError($"PowerUpManager: El prefab '{prefab.name}' (índice {i}) en la lista NO tiene el componente NetworkObject requerido.");
+                 validationFailed = true;
+            }
+            if (prefab.GetComponent<PowerUp>() == null)
+             {
+                 Debug.LogError($"PowerUpManager: El prefab '{prefab.name}' (índice {i}) en la lista NO tiene el componente PowerUp requerido.");
+                 validationFailed = true;
+            }
+        }
+        if (validationFailed) {
+            enabled = false; // Desactivar si alguna validación falló
+            return;
+        }
+        // --- Fin Validaciones ---
+
+
+        activePowerUps = new List<NetworkObject>(); // Inicializar la lista de seguimiento
+
+        // Iniciar el bucle de spawn si el intervalo es válido.
+        if (spawnInterval > 0)
+        {
+            StartCoroutine(SpawnLoop());
+            Debug.Log("PowerUpManager (Servidor): Iniciando bucle de spawn de PowerUps.");
         }
         else
         {
-            Debug.LogError("PowerUpManager: Prefab de PowerUp mal configurado.");
+            Debug.LogWarning("PowerUpManager: Intervalo de spawn es <= 0. No habrá spawn automático.");
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (IsServer)
+        {
+            StopAllCoroutines();
+        }
+        base.OnNetworkDespawn();
+    }
+
+
+    // =========================================
+    // --- Lógica de Spawn (Solo Servidor) ---
+    // =========================================
+
+    private IEnumerator SpawnLoop()
+    {
+        while (enabled && IsServer)
+        {
+            yield return new WaitForSeconds(spawnInterval);
+            CleanUpDespawnedPowerUps();
+            if (activePowerUps.Count < maxPowerUps)
+            {
+                TrySpawnSinglePowerUp();
+            }
+        }
+    }
+
+    private void TrySpawnSinglePowerUp()
+    {
+        if (!IsServer) return;
+
+        Transform spawnPoint = GetAvailableSpawnPoint();
+        if (spawnPoint == null)
+        {
+            return;
+        }
+
+        int randomIndex = Random.Range(0, powerUpPrefabs.Count);
+        GameObject prefabToSpawn = powerUpPrefabs[randomIndex];
+
+        if (prefabToSpawn == null) {
+            Debug.LogError($"PowerUpManager: ¡El prefab aleatorio seleccionado (índice {randomIndex}) es NULL! Saltando spawn.");
+            return;
+        }
+
+        GameObject powerUpInstance = Instantiate(prefabToSpawn, spawnPoint.position, spawnPoint.rotation);
+        NetworkObject netObj = powerUpInstance.GetComponent<NetworkObject>();
+
+        if (netObj != null)
+        {
+            // Spawnear el objeto en la red
+            netObj.Spawn(true);
+            activePowerUps.Add(netObj);
+
+            // --- CORRECCIÓN DEL ERROR AQUÍ ---
+            // Obtener el tipo del script PowerUp usando la variable pública 'Type'
+            PowerUp puScript = powerUpInstance.GetComponent<PowerUp>();
+            string puTypeString = "TipoDesconocido"; // Valor por defecto
+            if (puScript != null)
+            {
+                 puTypeString = puScript.Type.ToString(); // <--- USA LA VARIABLE 'Type'
+            }
+            else {
+                 Debug.LogWarning($"PowerUpManager: El prefab instanciado '{prefabToSpawn.name}' no tiene el script PowerUp para obtener el tipo.");
+            }
+             // --- FIN CORRECCIÓN ---
+
+            Debug.Log($"PowerUpManager: Spawneado '{prefabToSpawn.name}' (Tipo: {puTypeString}) en {spawnPoint.name}. Total activos: {activePowerUps.Count}/{maxPowerUps}");
+        }
+        else
+        {
+            Debug.LogError($"PowerUpManager: ¡El prefab instanciado '{prefabToSpawn.name}' no tiene NetworkObject! Destruyendo instancia local.");
             Destroy(powerUpInstance);
         }
     }
 
-     public override void OnNetworkDespawn() {
-         if (IsServer) {
-             StopAllCoroutines();
-             foreach(var powerupNetObj in activePowerUps) {
-                 if (powerupNetObj != null && powerupNetObj.IsSpawned) {
-                     powerupNetObj.Despawn(true);
-                 }
-             }
-             activePowerUps.Clear();
-         }
-         base.OnNetworkDespawn();
-     }
+    private void TrySpawnMultiple(int count)
+    {
+        if (!IsServer) return;
+        for (int i = 0; i < count && activePowerUps.Count < maxPowerUps; i++)
+        {
+            TrySpawnSinglePowerUp();
+        }
+    }
+
+    // =========================================
+    // --- Métodos Auxiliares (Solo Servidor) ---
+    // =========================================
+
+    private Transform GetAvailableSpawnPoint()
+    {
+        List<Transform> candidates = new List<Transform>(spawnPoints);
+        ShuffleList(candidates);
+
+        foreach (Transform point in candidates)
+        {
+            if (point == null) continue;
+
+            bool pointIsFree = true;
+            foreach (NetworkObject activePowerUp in activePowerUps)
+            {
+                if (activePowerUp == null || !activePowerUp.IsSpawned) continue;
+
+                if (Vector3.Distance(point.position, activePowerUp.transform.position) < minSpawnDistance)
+                {
+                    pointIsFree = false;
+                    break;
+                }
+            }
+
+            if (pointIsFree)
+            {
+                return point;
+            }
+        }
+        return null;
+    }
+
+    private void CleanUpDespawnedPowerUps()
+    {
+        int removedCount = activePowerUps.RemoveAll(item => item == null || !item.IsSpawned);
+        // Log opcional:
+        // if (removedCount > 0)
+        // {
+        //     Debug.Log($"PowerUpManager: Limpiados {removedCount} PowerUps recogidos/destruidos. Total activos: {activePowerUps.Count}/{maxPowerUps}");
+        // }
+    }
+
+    private void ShuffleList<T>(List<T> list)
+    {
+        int n = list.Count;
+        while (n > 1)
+        {
+            n--;
+            int k = Random.Range(0, n + 1);
+            T value = list[k];
+            list[k] = list[n];
+            list[n] = value;
+        }
+    }
 }

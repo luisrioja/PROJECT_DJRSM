@@ -388,13 +388,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 97f87e8222b1da04fbbfd3e2ec8acaf6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  powerUpPrefab: {fileID: 2608321040671067243, guid: 13bf705b970574c43b47791dad77462c, type: 3}
+  powerUpPrefabs:
+  - {fileID: 2608321040671067243, guid: 8b41b4a32a61e5547ae295fc9d4740ae, type: 3}
+  - {fileID: 2608321040671067243, guid: ba1b86ea63b65a540910e0a2df1ad9b3, type: 3}
+  - {fileID: 2608321040671067243, guid: 13bf705b970574c43b47791dad77462c, type: 3}
   spawnPoints:
   - {fileID: 1692582972}
   - {fileID: 1879480562}
-  spawnInterval: 15
-  initialDelay: 5
-  maxConcurrentPowerUps: 2
+  maxPowerUps: 5
+  spawnInterval: 5
+  minSpawnDistance: 2
 --- !u!1 &626120139
 GameObject:
   m_ObjectHideFlags: 0

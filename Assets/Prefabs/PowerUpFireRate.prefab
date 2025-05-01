@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 390945685111055133}
   - component: {fileID: 4964228480100848497}
   m_Layer: 0
-  m_Name: PowerUp
+  m_Name: PowerUpFireRate
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -43,7 +43,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2608321040671067243}
-  m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!23 &5043562676123733344
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -124,7 +124,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 1759574378
+  GlobalObjectIdHash: 2464195423
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -146,7 +146,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Type:
-    m_InternalValue: 0
+    m_InternalValue: 1
   speedVisual: {fileID: 848566922745830556, guid: e30bb833b1f1fae4e845d77b402ddf64, type: 3}
   fireRateVisual: {fileID: 8887383782444826345, guid: adb41e973431f3a40944252020bd11dc, type: 3}
   healthVisual: {fileID: 2703503293360532592, guid: 7bb95bca401ff474b8d92ab22f25020c, type: 3}

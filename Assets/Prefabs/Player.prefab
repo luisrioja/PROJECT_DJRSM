@@ -256,7 +256,7 @@ MonoBehaviour:
   audioListener: {fileID: 651563882983310196}
   playerLookScript: {fileID: 7387846807266027062}
   moveSpeed: 2
-  serverMouseSensitivity: 100
+  serverMouseSensitivity: 200
   minVerticalAngle: -90
   maxVerticalAngle: 90
   maxHealth: 100
@@ -417,7 +417,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 72e57824bfaeff9439a8eb09d6d5e59a, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
