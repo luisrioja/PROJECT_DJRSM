@@ -53,13 +53,22 @@ public class Player : NetworkBehaviour
     [SerializeField] private Camera playerCamera;
     [Tooltip("Componente AudioListener asociado a la cámara del jugador")]
     [SerializeField] private AudioListener audioListener;
-    [Tooltip("Script opcional para controlar la vista con el ratón (PlayerLook)")]
-    [SerializeField] private PlayerLook playerLookScript; // Necesita PlayerLook.cs
+    [Tooltip("Script PlayerLook para control de cámara (AHORA gestionado por servidor)")]
+    [SerializeField] private PlayerLook playerLookScript; // Referencia necesaria para aplicar rotación vertical local
 
     // ----- Movimiento -----
     [Header("Movimiento")]
     [Tooltip("Velocidad base de movimiento del jugador")]
     [SerializeField] private float moveSpeed = 5.0f;
+
+    // ----- Rotación Cámara (Autoridad Servidor) ----- // NUEVA SECCIÓN
+    [Header("Rotación Cámara (Autoridad Servidor)")]
+    [Tooltip("Sensibilidad del ratón aplicada en el servidor")]
+    [SerializeField] private float serverMouseSensitivity = 100f;
+    [Tooltip("Ángulo vertical mínimo (mirar abajo)")]
+    [SerializeField] private float minVerticalAngle = -90f;
+    [Tooltip("Ángulo vertical máximo (mirar arriba)")]
+    [SerializeField] private float maxVerticalAngle = 90f;
 
     // ----- Vida -----
     [Header("Vida")]
@@ -131,6 +140,15 @@ public class Player : NetworkBehaviour
         NetworkVariableReadPermission.Everyone, // Todos pueden leer
         NetworkVariableWritePermission.Server); // Solo el servidor escribe
 
+    // --- NUEVA NetworkVariable para Rotación Vertical ---
+    [Tooltip("Rotación vertical actual de la cámara (Pitch), gestionada por el servidor.")]
+    private NetworkVariable<float> networkVerticalRotation = new NetworkVariable<float>(
+        0f,                                     // Valor inicial
+        NetworkVariableReadPermission.Everyone, // Todos pueden leer
+        NetworkVariableWritePermission.Server   // Solo el servidor puede escribir
+    );
+    // --- FIN NUEVA NetworkVariable ---
+
     // ==================================
     // --- SECCIÓN: Referencias Internas y Estado Local ---
     // ==================================
@@ -175,6 +193,10 @@ public class Player : NetworkBehaviour
         if (rb == null) Debug.LogError($"Player {OwnerClientId}: Necesita un Rigidbody.");
         // playerMeshRenderer es opcional pero recomendado para feedback visual.
         if (playerMeshRenderer == null) Debug.LogWarning($"Player {OwnerClientId}: Asignar 'Player Mesh Renderer' en Inspector para cambios de color.");
+        // Obtener referencia a PlayerLook (necesaria para callbacks de rotación).
+        playerLookScript = GetComponent<PlayerLook>();
+        if (playerLookScript == null) Debug.LogError($"Player {OwnerClientId}: PlayerLook script no encontrado/asignado. La rotación de cámara NO funcionará.");
+
 
         // Guardar valores base para poder revertir efectos de Power-ups.
         baseMoveSpeed = moveSpeed;
@@ -189,17 +211,34 @@ public class Player : NetworkBehaviour
         NetworkSalud.OnValueChanged += OnHealthChanged;
         IsDead.OnValueChanged += OnIsDeadChanged;
 
+        // --- SUSCRIPCIÓN A NUEVA NETWORKVARIABLE ---
+        // Solo los clientes no-servidores necesitan suscribirse al cambio de rotación vertical.
+        // El host (servidor+cliente) lo aplicará directamente en el RPC.
+        if (!IsServer)
+        {
+            networkVerticalRotation.OnValueChanged += HandleVerticalRotationChanged;
+        }
+        // Aplicar rotación vertical inicial al spawnear (para todos, incluyendo late joiners)
+        if (playerLookScript != null)
+        {
+            playerLookScript.SetVerticalRotationLocally(networkVerticalRotation.Value);
+        }
+        // --- FIN SUSCRIPCIÓN ---
+
+
         // --- Lógica Específica del Propietario vs. Remoto ---
         if (IsOwner) // Este script pertenece al jugador local.
         {
             // --- ACTIVACIÓN DE CÁMARA Y CONTROL LOCAL ---
-            // Habilitar la cámara, el listener y el script de control de vista de este jugador.
+            // Habilitar la cámara y el listener de este jugador.
             if (playerCamera != null) playerCamera.enabled = true;
             else Debug.LogError($"Player {OwnerClientId}: Player Camera no asignada en Inspector.");
             if (audioListener != null) audioListener.enabled = true;
             else Debug.LogError($"Player {OwnerClientId}: Audio Listener no asignado en Inspector.");
-            if (playerLookScript != null) playerLookScript.enabled = true; // Activar script de look
-            else Debug.LogWarning($"Player {OwnerClientId}: PlayerLook script no asignado, no habrá control de cámara.");
+
+            // IMPORTANTE: El script PlayerLook YA NO se activa/desactiva aquí.
+            // Debe estar SIEMPRE ACTIVO en el prefab para leer input (si es dueño) y aplicar rotación (siempre).
+            // if (playerLookScript != null) playerLookScript.enabled = true; // <-- ELIMINADO/COMENTADO
 
             // Desactivar la cámara principal de la escena para evitar conflictos.
              Camera sceneCamera = Camera.main;
@@ -214,16 +253,15 @@ public class Player : NetworkBehaviour
             SetupLocalUI();
 
             // NOTA: La solicitud de datos iniciales (color/spawn) ahora la gestiona GameManager al conectar.
-            // La llamada a RequestInitialDataServerRpc() aquí es redundante para eso, pero podría usarse para otros datos.
-            // RequestInitialDataServerRpc();
         }
         else // Este script pertenece a un jugador remoto.
         {
              // --- DESACTIVACIÓN DE CÁMARA Y CONTROL REMOTO ---
-             // Deshabilitar cámara, listener y script de look para no ver/oir/controlar desde este avatar.
+             // Deshabilitar cámara y listener para no ver/oir desde este avatar.
             if (playerCamera != null) playerCamera.enabled = false;
             if (audioListener != null) audioListener.enabled = false;
-            if (playerLookScript != null) playerLookScript.enabled = false;
+            // PlayerLook tampoco se desactiva aquí, necesita aplicar la rotación vertical recibida.
+            // if (playerLookScript != null) playerLookScript.enabled = false; // <-- ELIMINADO/COMENTADO
             // --- FIN DESACTIVACIÓN CÁMARA ---
 
             // Configurar la barra de vida flotante sobre este avatar remoto.
@@ -235,7 +273,14 @@ public class Player : NetworkBehaviour
 
         // Ajustar físicas: Los clientes no deben simular física principal para evitar desincronización.
         // NetworkRigidbody/Transform gestionan la sincronización desde el servidor.
-        if (!IsServer) rb.isKinematic = true;
+        // Si usamos NetworkRigidbody, él maneja el isKinematic. Si usamos NetworkTransform con Rigidbody, lo hacemos manualmente.
+        var netRigidbody = GetComponent<NetworkRigidbody>(); // Comprobar si existe NetworkRigidbody
+        if (!IsServer && netRigidbody == null) // Solo hacerlo si NO usamos NetworkRigidbody
+        {
+             rb.isKinematic = true;
+        }
+        // Si IS DEAD, isKinematic se gestiona en OnIsDeadChanged
+        if (IsDead.Value) rb.isKinematic = true;
     }
 
     /// <summary>
@@ -284,6 +329,11 @@ public class Player : NetworkBehaviour
              // Enviar petición de dash al servidor.
              SubmitDashRequestServerRpc(dashDir);
         }
+
+        // --- INPUT DE CÁMARA ---
+        // PlayerLook.cs ahora lee el input del ratón en su propio Update()
+        // y llama a UpdateLookInputServerRpc() directamente desde allí.
+        // Ya no necesitamos leer Input.GetAxis("Mouse X/Y") aquí.
     }
 
     /// <summary>
@@ -296,6 +346,13 @@ public class Player : NetworkBehaviour
         if (NetworkColor != null) NetworkColor.OnValueChanged -= ColorChanged;
         if (NetworkSalud != null) NetworkSalud.OnValueChanged -= OnHealthChanged;
         if (IsDead != null) IsDead.OnValueChanged -= OnIsDeadChanged;
+
+        // --- DESUSCRIPCIÓN DE NUEVA NETWORKVARIABLE ---
+        if (networkVerticalRotation != null && !IsServer) // Solo desuscribir si estábamos suscritos
+        {
+            networkVerticalRotation.OnValueChanged -= HandleVerticalRotationChanged;
+        }
+        // --- FIN DESUSCRIPCIÓN ---
 
         // Limpiar instancias de UI creadas dinámicamente.
         if (healthBarInstance != null) Destroy(healthBarInstance);
@@ -345,8 +402,11 @@ public class Player : NetworkBehaviour
         var networkTransform = GetComponent<NetworkTransform>();
         if (networkTransform == null) Debug.LogError($"Player {OwnerClientId}: NetworkTransform no encontrado.");
         // IsServerAuthoritative() es el chequeo correcto para versiones con y sin la opción en Inspector.
-        else if (!networkTransform.IsServerAuthoritative())
-             Debug.LogWarning($"Player {OwnerClientId}: ¡CONFIGURACIÓN INCORRECTA! NetworkTransform NO es Server Authoritative. El PDF requiere autoridad del servidor.");
+        // En Netcode for GameObjects >= 1.0, NetworkTransform es inherentemente Server Authoritative.
+        // ClientNetworkTransform existe para autoridad del cliente.
+        // Así que esta comprobación puede ser menos relevante o necesitar adaptarse a la versión exacta.
+        // else if (!networkTransform.IsServerAuthoritative()) // Podría dar error si el método no existe
+        //      Debug.LogWarning($"Player {OwnerClientId}: ¡CONFIGURACIÓN INCORRECTA! NetworkTransform NO es Server Authoritative. El PDF requiere autoridad del servidor.");
      }
 
     // ===============================================
@@ -399,17 +459,17 @@ public class Player : NetworkBehaviour
         // No desactivar el collider principal para evitar caer por el suelo.
         // GetComponent<Collider>().enabled = !newValue; // COMENTADO/ELIMINADO
 
-        // En su lugar, hacer el Rigidbody kinemático al morir para detener física.
+        // Hacer el Rigidbody kinemático al morir para detener física y evitar que otros lo muevan.
         if (rb != null) {
-            rb.isKinematic = newValue; // Kinematic = true si muerto, false si vivo (en servidor).
-            if (newValue) { // Si acaba de morir.
+            bool shouldBeKinematic = newValue || (!IsServer && GetComponent<NetworkRigidbody>() == null); // Muerto O cliente sin NetworkRigidbody
+            if (rb.isKinematic != shouldBeKinematic) // Solo cambiar si es necesario
+            {
+                 rb.isKinematic = shouldBeKinematic;
+            }
+
+            if (justDied) { // Si acaba de morir.
                 rb.linearVelocity = Vector3.zero;        // Detener todo movimiento físico.
                 rb.angularVelocity = Vector3.zero; // Detener toda rotación física.
-            }
-            // Al revivir (justRespawned), si somos servidor, restaurar isKinematic a false (si no lo es por defecto).
-            // NetworkRigidbody debería manejar esto en clientes.
-            else if (IsServer && !rb.isKinematic && justRespawned) {
-                 // rb.isKinematic = false; // Asegurar que no sea kinemático en servidor al revivir.
             }
         }
 
@@ -440,6 +500,20 @@ public class Player : NetworkBehaviour
             }
         }
     }
+
+    // --- NUEVO CALLBACK para Rotación Vertical ---
+    /// <summary>
+    /// Callback para cambios en networkVerticalRotation. Llamado en clientes no-servidores.
+    /// </summary>
+    private void HandleVerticalRotationChanged(float previousValue, float newValue)
+    {
+        // Llama al método en PlayerLook para aplicar la rotación al cameraHolder local.
+        if (playerLookScript != null)
+        {
+            playerLookScript.SetVerticalRotationLocally(newValue);
+        }
+    }
+    // --- FIN NUEVO CALLBACK ---
 
     // ===========================================
     // --- SECCIÓN: Actualización de UI / Visual ---
@@ -485,11 +559,58 @@ public class Player : NetworkBehaviour
     [ServerRpc]
     void SubmitMovementRequestServerRpc(Vector3 direction, ServerRpcParams rpcParams = default)
     {
-        // Ignorar si el jugador que envió el RPC está muerto.
-        if (IsDead.Value) return;
+        // Ignorar si el jugador que envió el RPC está muerto o haciendo dash.
+        if (IsDead.Value || isDashing) return;
         // Aplicar movimiento al transform. NetworkTransform sincronizará la posición.
-        transform.Translate(direction * moveSpeed * Time.deltaTime, Space.World);
+        // Usar rb.MovePosition si se prefiere movimiento basado en física y se gestionan colisiones mejor.
+        // transform.Translate(direction * moveSpeed * Time.deltaTime, Space.World);
+        // Alternativa con Rigidbody (mejor para colisiones si no es kinematic):
+        if (rb != null && !rb.isKinematic)
+        {
+            rb.MovePosition(rb.position + transform.TransformDirection(direction) * moveSpeed * Time.deltaTime);
+        }
+        else // Fallback a Translate si es kinematic o no hay rb
+        {
+             transform.Translate(transform.TransformDirection(direction) * moveSpeed * Time.deltaTime, Space.World);
+        }
     }
+
+    // --- NUEVO ServerRpc para Input de Cámara ---
+    /// <summary>
+    /// [ServerRpc] Recibe el delta del input del ratón desde el cliente propietario.
+    /// Ejecuta la lógica de rotación en el servidor.
+    /// </summary>
+    [ServerRpc]
+    public void UpdateLookInputServerRpc(float mouseXDelta, float mouseYDelta, ServerRpcParams rpcParams = default)
+    {
+        // Solo el servidor ejecuta esto
+        ulong clientId = rpcParams.Receive.SenderClientId; // Podría usarse para validación si fuera necesario
+
+        // Ignorar si el jugador está muerto o haciendo dash
+        if (IsDead.Value || isDashing) return;
+
+        // 1. Aplicar rotación horizontal al Player (el NetworkTransform la sincronizará)
+        // Usamos Rotate para aplicar el delta directamente. Aplicamos sensibilidad y delta time aquí.
+        transform.Rotate(Vector3.up * mouseXDelta * serverMouseSensitivity * Time.deltaTime);
+
+        // 2. Calcular y aplicar rotación vertical (guardarla en NetworkVariable)
+        float currentVertical = networkVerticalRotation.Value;
+        // Aplicamos sensibilidad, delta time y restamos Y porque Input.GetAxis("Mouse Y") es positivo hacia arriba.
+        currentVertical -= mouseYDelta * serverMouseSensitivity * Time.deltaTime;
+        // Limitar (Clamp) la rotación vertical.
+        currentVertical = Mathf.Clamp(currentVertical, minVerticalAngle, maxVerticalAngle);
+
+        // Actualizar la NetworkVariable (esto notificará a los clientes suscritos mediante HandleVerticalRotationChanged)
+        networkVerticalRotation.Value = currentVertical;
+
+        // Opcional: Si el servidor también es un cliente (Host), aplicar directamente la rotación vertical localmente
+        // para evitar la pequeña latencia de espera al callback de la NetworkVariable.
+         if (IsHost && playerLookScript != null)
+         {
+             playerLookScript.SetVerticalRotationLocally(currentVertical);
+         }
+    }
+    // --- FIN NUEVO ServerRpc ---
 
     /// <summary>
     /// [ServerRpc] Recibe la petición de disparo, instancia y hace spawn de la bala en el servidor.
@@ -497,8 +618,8 @@ public class Player : NetworkBehaviour
     [ServerRpc]
     void SubmitFireRequestServerRpc(Vector3 spawnPos, Quaternion spawnRot, ServerRpcParams rpcParams = default)
     {
-        // Ignorar si muerto.
-        if (IsDead.Value) return;
+        // Ignorar si muerto o haciendo dash.
+        if (IsDead.Value || isDashing) return;
         ulong clientId = rpcParams.Receive.SenderClientId;
 
         // Validar cooldown en servidor si es necesario para mayor seguridad.
@@ -517,14 +638,15 @@ public class Player : NetworkBehaviour
             {
                 // Obtener el color visual actual del jugador (puede diferir de NetworkColor si está muerto).
                 Color jugadorColorActual = playerMeshRenderer != null ? playerMeshRenderer.material.color : NetworkColor.Value;
-                if (IsDead.Value) jugadorColorActual = deadColor;
+                // Si está muerto, usamos el color de muerto para la bala (aunque no debería poder disparar muerto).
+                //if (IsDead.Value) jugadorColorActual = deadColor;
 
                 // Inicializar la bala con datos del dueño, color y efecto de impacto. (ANTES de Spawn).
                 bulletScript.Initialize(OwnerClientId, jugadorColorActual, bulletImpactEffectPrefab);
 
                 // Hacer que la bala aparezca en la red para todos los clientes. (El servidor es el propietario).
                 bulletNetworkObject.Spawn(true); // true = destruir con el servidor.
-                Debug.Log($"Servidor: Bala spawneada para {clientId}");
+                // Debug.Log($"Servidor: Bala spawneada para {clientId}");
             }
             else // Error en la configuración del prefab de bala.
             {
@@ -544,8 +666,8 @@ public class Player : NetworkBehaviour
     [ServerRpc]
     void SubmitInteractionRequestServerRpc(ServerRpcParams rpcParams = default)
     {
-        // Ignorar si muerto.
-        if (IsDead.Value) return;
+        // Ignorar si muerto o haciendo dash.
+        if (IsDead.Value || isDashing) return;
         ulong clientId = rpcParams.Receive.SenderClientId;
         // Debug.Log($"Servidor: Jugador {clientId} intentó interactuar.");
 
@@ -575,7 +697,7 @@ public class Player : NetworkBehaviour
         // Si se encontró un objeto interactuable cercano.
         if (closestInteractable != null)
         {
-            Debug.Log($"Servidor: Jugador {clientId} interactuando con {closestInteractable.name}");
+            // Debug.Log($"Servidor: Jugador {clientId} interactuando con {closestInteractable.name}");
             Door doorToToggle = closestInteractable.GetComponent<Door>();
             if (doorToToggle != null) {
                 // Llamar al método público en Door.cs para cambiar su estado.
@@ -613,7 +735,9 @@ public class Player : NetworkBehaviour
     {
         // El RPC se envía a un cliente específico, pero por seguridad comprobamos IsOwner.
         if (!IsOwner) return;
-        transform.position = position;
+        // Es más seguro mover el Rigidbody si existe y no es kinemático.
+        if (rb != null && !rb.isKinematic) rb.position = position;
+        else transform.position = position; // Fallback a transform.position
     }
 
     /// <summary>
@@ -625,7 +749,7 @@ public class Player : NetworkBehaviour
         // Instanciar efecto visual si está asignado y autodestruirlo.
         if (dashEffectPrefab != null) {
              GameObject fx = Instantiate(dashEffectPrefab, transform.position, Quaternion.LookRotation(direction));
-             Destroy(fx, 1.0f);
+             Destroy(fx, 1.0f); // Destruir efecto después de 1 segundo.
         }
     }
 
@@ -637,8 +761,10 @@ public class Player : NetworkBehaviour
     private void NotifyPowerUpPickupClientRpc(PowerUpType type, ClientRpcParams clientRpcParams = default)
     {
         // El RPC ya está dirigido al cliente correcto (ver ServerHandlePowerUpPickup).
-        // No es estrictamente necesario comprobar IsOwner aquí si el envío es correcto.
-        Debug.Log($"Player (Cliente {OwnerClientId}): Recibí notificación de recogida de {type}!");
+        // Comprobar IsOwner es una buena práctica por si acaso.
+        if (!IsOwner) return;
+
+        // Debug.Log($"Player (Cliente {OwnerClientId}): Recibí notificación de recogida de {type}!");
         // Iniciar la corutina local que maneja los efectos visuales y su duración.
         StartCoroutine(HandlePowerUpEffectLocal(type));
     }
@@ -680,7 +806,7 @@ public class Player : NetworkBehaviour
         // Establecer la NetworkVariable que sincronizará el estado a los clientes
         // y disparará el callback OnIsDeadChanged.
         IsDead.Value = true;
-        Debug.Log($"Servidor: Jugador {OwnerClientId} ha muerto.");
+        // Debug.Log($"Servidor: Jugador {OwnerClientId} ha muerto.");
 
         // NO iniciar respawn automático aquí si el requisito es ver al jugador muerto.
         // // StartCoroutine(RespawnTimer(5.0f));
@@ -699,10 +825,10 @@ public class Player : NetworkBehaviour
     /// Restaura la salud, desmarca IsDead y lo reposiciona.
     /// Necesita ser llamada externamente (ej. por GameManager o input).
     /// </summary>
-    private void Respawn() {
+    public void Respawn() { // Hecho público para poder llamarlo externamente
         // Solo el servidor puede revivir.
         if (!IsServer) return;
-        Debug.Log($"Servidor: Respawneando jugador {OwnerClientId}");
+        // Debug.Log($"Servidor: Respawneando jugador {OwnerClientId}");
 
         // Obtener una posición de spawn (idealmente desde GameManager).
         Vector3 spawnPos = Vector3.up; // Posición por defecto.
@@ -713,11 +839,15 @@ public class Player : NetworkBehaviour
         }
 
         // Reposicionar al jugador en el servidor (NetworkTransform sincronizará).
+        // Usar TeleportClientRpc para asegurar la posición exacta en el cliente propietario si fuera necesario,
+        // aunque NetworkTransform debería ser suficiente si está bien configurado.
         transform.position = spawnPos;
+        // Podríamos llamar a TeleportClientRpc si NetworkTransform da problemas con el respawn inmediato:
+        // TeleportClientRpc(spawnPos, new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } } });
+
 
         // Restaurar salud al máximo.
         NetworkSalud.Value = maxHealth;
-
         // Marcar como vivo (esto dispara OnIsDeadChanged para restaurar estado visual/físico).
         IsDead.Value = false;
     }
@@ -727,8 +857,13 @@ public class Player : NetworkBehaviour
     /// Redirige a TakeDamage asegurando que solo el servidor procese el daño.
     /// </summary>
     public void QuitarVida(int cantidad) {
-        TakeDamage(cantidad);
+        // Asegurarse de que solo el servidor ejecute el TakeDamage
+        if (IsServer) TakeDamage(cantidad);
+        // Si se llama desde cliente, podríamos necesitar un ServerRpc para pedir quitar vida.
+        // else RequestTakeDamageServerRpc(cantidad); // Ejemplo si fuera necesario
     }
+    // [ServerRpc] void RequestTakeDamageServerRpc(int amount) { TakeDamage(amount); }
+
 
     // ===========================================
     // --- SECCIÓN: Lógica de Power-Ups ---
@@ -776,7 +911,7 @@ public class Player : NetworkBehaviour
                 NetworkSalud.Value = Mathf.Min(maxHealth, NetworkSalud.Value + healthBoostAmount);
                 break;
         }
-        Debug.Log($"Player (Servidor {OwnerClientId}): Efecto {type} aplicado.");
+        // Debug.Log($"Player (Servidor {OwnerClientId}): Efecto {type} aplicado.");
     }
 
     /// <summary>
@@ -786,7 +921,7 @@ public class Player : NetworkBehaviour
     private IEnumerator ServerPowerUpDuration(PowerUpType type, float duration)
     {
         // Aplicar el efecto al inicio de la corutina.
-        float originalValue = 0; // Para logs o lógica más compleja.
+        // float originalValue = 0; // Para logs o lógica más compleja.
         switch (type) {
             case PowerUpType.Speed: moveSpeed = baseMoveSpeed * speedBoostMultiplier; break;
             case PowerUpType.FireRate: fireRate = baseFireRate / fireRateBoostMultiplier; break;
@@ -797,11 +932,13 @@ public class Player : NetworkBehaviour
         yield return new WaitForSeconds(duration);
 
         // Revertir el efecto usando los valores base guardados en OnNetworkSpawn.
+        // ¡Importante! Asegurarse de que otro power-up del mismo tipo no haya reiniciado el timer.
+        // Una gestión más robusta usaría contadores o timestamps. Esta es la versión simple.
         switch (type) {
             case PowerUpType.Speed: moveSpeed = baseMoveSpeed; break;
             case PowerUpType.FireRate: fireRate = baseFireRate; break;
         }
-         Debug.Log($"Player (Servidor {OwnerClientId}): Efecto {type} expirado.");
+         // Debug.Log($"Player (Servidor {OwnerClientId}): Efecto {type} expirado.");
     }
 
     /// <summary>
@@ -811,6 +948,18 @@ public class Player : NetworkBehaviour
     {
         GameObject visualEffectInstance = null;
         float currentDuration = powerUpDuration; // Usar duración estándar.
+
+        // --- Gestión de Efectos Visuales Superpuestos ---
+        // Antes de activar uno nuevo, desactivar y detener el anterior del mismo tipo si existe.
+        ActivePowerUp existingPowerup = activePowerUps.Find(p => p.Type == type);
+        if (existingPowerup.VisualEffect != null || existingPowerup.ExpiryCoroutine != null)
+        {
+            if (existingPowerup.VisualEffect != null) existingPowerup.VisualEffect.SetActive(false);
+            if (existingPowerup.ExpiryCoroutine != null) StopCoroutine(existingPowerup.ExpiryCoroutine);
+            activePowerUps.Remove(existingPowerup);
+        }
+        // --- Fin Gestión Superpuestos ---
+
 
         // Activar el GameObject del efecto visual correspondiente localmente.
         switch (type) {
@@ -840,12 +989,16 @@ public class Player : NetworkBehaviour
         // Esperar si hay duración.
         if (duration > 0) yield return new WaitForSeconds(duration);
 
-        // Desactivar el efecto visual si existe.
-        if (trackingInfo.VisualEffect != null) trackingInfo.VisualEffect.SetActive(false);
+        // Solo desactivar/eliminar si todavía está en la lista activa (evita errores si se limpió antes)
+        if (activePowerUps.Contains(trackingInfo))
+        {
+             // Desactivar el efecto visual si existe.
+            if (trackingInfo.VisualEffect != null) trackingInfo.VisualEffect.SetActive(false);
 
-        // Eliminar de la lista de seguimiento local.
-        activePowerUps.Remove(trackingInfo);
-        // Debug.Log($"Player (Cliente {OwnerClientId}): Efecto visual local para {type} revertido.");
+            // Eliminar de la lista de seguimiento local.
+            activePowerUps.Remove(trackingInfo);
+            // Debug.Log($"Player (Cliente {OwnerClientId}): Efecto visual local para {type} revertido.");
+        }
     }
 
      /// <summary>
@@ -856,13 +1009,16 @@ public class Player : NetworkBehaviour
          // Solo el propietario tiene efectos locales que gestionar.
          if (!IsOwner) return;
 
-         foreach(var powerup in activePowerUps) {
-             // Desactivar visual.
-             if (powerup.VisualEffect != null) powerup.VisualEffect.SetActive(false);
+         // Copiar a una lista temporal para iterar porque RevertPowerUpEffectLocal modifica la lista original.
+         List<ActivePowerUp> powerupsToStop = new List<ActivePowerUp>(activePowerUps);
+
+         foreach(var powerup in powerupsToStop) {
              // Detener corutina de expiración si aún se está ejecutando.
              if (powerup.ExpiryCoroutine != null) StopCoroutine(powerup.ExpiryCoroutine);
+             // Desactivar visual.
+             if (powerup.VisualEffect != null) powerup.VisualEffect.SetActive(false);
          }
-         // Limpiar la lista de seguimiento.
+         // Limpiar la lista de seguimiento original.
          activePowerUps.Clear();
      }
 
@@ -879,9 +1035,9 @@ public class Player : NetworkBehaviour
          // Solo el servidor ejecuta la lógica de movimiento real.
          if (!IsServer) yield break;
 
-         isDashing = true; // Marcar inicio del dash.
-         bool originalGravity = rb.useGravity; // Guardar estado de gravedad.
-         rb.useGravity = false; // Desactivar gravedad durante el dash.
+         isDashing = true; // Marcar inicio del dash. Podría usarse para evitar daño en TakeDamage.
+         bool originalGravity = false;
+         if(rb!= null) { originalGravity = rb.useGravity; rb.useGravity = false; } // Desactivar gravedad durante el dash.
 
          float elapsedTime = 0f;
          Vector3 startPos = transform.position;
@@ -891,33 +1047,47 @@ public class Player : NetworkBehaviour
          // Raycast: Comprobar si hay un obstáculo en la trayectoria del dash.
          RaycastHit hit;
          // Lanzar rayo desde la posición inicial en la dirección del dash, hasta la distancia máxima.
-         if (Physics.Raycast(startPos, direction, out hit, dashDistance)) {
+         // Ignorar la capa del propio jugador si está configurada.
+         int layerMask = ~LayerMask.GetMask("Player"); // Ejemplo: Ignorar capa "Player"
+         if (Physics.Raycast(startPos, direction, out hit, dashDistance, layerMask)) {
              // Si choca, ajustar la posición objetivo para detenerse justo antes del obstáculo.
              targetPos = hit.point - direction * 0.1f; // Pequeño margen para no quedar dentro.
-             Debug.Log($"Player (Servidor {OwnerClientId}): Dash interrumpido por obstáculo {hit.collider.name}");
+             // Debug.Log($"Player (Servidor {OwnerClientId}): Dash interrumpido por obstáculo {hit.collider.name}");
          }
 
          // Calcular velocidad constante necesaria para cubrir la distancia (ajustada o completa) en 'dashDuration'.
          float actualDashDistance = Vector3.Distance(startPos, targetPos);
-         Vector3 velocity = direction * (actualDashDistance / dashDuration); // Velocidad = Distancia / Tiempo
+         // Evitar división por cero si dashDuration es muy pequeño o cero.
+         Vector3 velocity = (dashDuration > 0.001f) ? direction * (actualDashDistance / dashDuration) : Vector3.zero;
 
          // Mover durante 'dashDuration'.
          while (elapsedTime < dashDuration) {
-            // Mover usando Translate para un control más directo (ignora gran parte de la física).
-            transform.Translate(velocity * Time.deltaTime, Space.World);
-            // Podríamos añadir un segundo Raycast aquí si quisiéramos detectar colisiones *durante* el dash.
+            // Mover usando rb.MovePosition si no es kinematic para mejor manejo de colisiones,
+            // o transform.Translate si es kinematic o no hay Rigidbody.
+             if (rb != null && !rb.isKinematic)
+             {
+                 rb.MovePosition(rb.position + velocity * Time.deltaTime);
+             }
+             else
+             {
+                 transform.Translate(velocity * Time.deltaTime, Space.World);
+             }
 
             elapsedTime += Time.deltaTime;
             yield return null; // Esperar al siguiente frame.
          }
 
-         // Asegurar posición final (opcional, Translate debería ser preciso).
-         // transform.position = targetPos;
+         // Asegurar posición final (más importante si se usa Translate).
+         // Podría causar un pequeño salto si hubo colisiones no detectadas por el Raycast inicial.
+         // Considera si es necesario o si NetworkTransform suavizará suficiente.
+         // transform.position = targetPos; // Comentado por defecto
 
          // Restaurar estado post-dash.
-         rb.linearVelocity = Vector3.zero; // Detener cualquier velocidad residual.
-         rb.useGravity = originalGravity; // Restaurar gravedad.
+         if (rb != null) {
+             rb.linearVelocity = Vector3.zero; // Detener cualquier velocidad residual.
+             rb.useGravity = originalGravity; // Restaurar gravedad.
+         }
          isDashing = false; // Marcar fin del dash.
          // Debug.Log($"Player (Servidor {OwnerClientId}): Dash finalizado.");
     }
-} 
+}
