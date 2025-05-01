@@ -256,6 +256,9 @@ MonoBehaviour:
   audioListener: {fileID: 651563882983310196}
   playerLookScript: {fileID: 7387846807266027062}
   moveSpeed: 2
+  serverMouseSensitivity: 100
+  minVerticalAngle: -90
+  maxVerticalAngle: 90
   maxHealth: 100
   deadColor: {r: 1, g: 0, b: 0, a: 1}
   fireRate: 0.5
@@ -290,9 +293,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b520ac382a900c946af50b148bd14aa7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mouseSensitivity: 100
-  playerBody: {fileID: 7493450710732663834}
   cameraHolder: {fileID: 61200696840854570}
+  localMouseSensitivity: 1
 --- !u!114 &4386796953204370368
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -334,7 +336,7 @@ Rigidbody:
   serializedVersion: 4
   m_Mass: 1
   m_Drag: 0
-  m_AngularDrag: 0.05
+  m_AngularDrag: 20
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
