@@ -3,83 +3,138 @@ using Unity.Netcode;
 
 public class NetworkHUD : MonoBehaviour
 {
+    // Variable para mostrar el ID del cliente local
+    private ulong localClientId = ulong.MaxValue;
+
+    void Start() {
+        // Suscribirse para obtener el ID del cliente cuando esté disponible
+        if (NetworkManager.Singleton != null) {
+             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+        }
+    }
+
+     void OnDestroy() {
+         // Desuscribirse para evitar errores
+         if (NetworkManager.Singleton != null) {
+             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+             NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+         }
+     }
+
+    private void OnClientConnected(ulong clientId) {
+        // Comprobar si NOSOTROS somos el cliente que se conectó
+        if (NetworkManager.Singleton.LocalClientId == clientId) {
+            localClientId = clientId;
+        }
+    }
+     private void OnClientDisconnected(ulong clientId) {
+          if (NetworkManager.Singleton.LocalClientId == clientId) {
+            localClientId = ulong.MaxValue; // Resetear al desconectar
+        }
+     }
+
+
     void OnGUI()
     {
-        // Creamos una interfaz en pantalla
-        GUILayout.BeginArea(new Rect(10, 10, 300, 300));
-        // Si no somo un cliente o un servidor
+        GUILayout.BeginArea(new Rect(10, 10, 300, 350)); // Aumentar altura un poco
         if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
         {
-            // Mostramos los botones para iniciar una conexion
             StartButtons();
         }
         else
         {
-            // Mostramos el estado del multijugador
             StatusLabels();
-            // Si queremos pedir una nueva posicion
-            SubmitNewPosition();
-            // Si soy el servidor, mostrar botones de colores
-            if(NetworkManager.Singleton.IsServer)
-            {
-                if (GUILayout.Button("Blue")) // Muestra un boton con el texto azul
-                {
-                    // Se ejecuta cuando se pulsa el boton
-                    var players = GameObject.FindObjectsOfType<Player>(); // Devuelve un array con los componentes
-                    var playersGameObjects = GameObject.FindGameObjectsWithTag("Player"); // Devuelve un array con los GameObjects
-                    for(int i = 0; i < players.Length; i++)
-                    {
-                        var player = players[i];
-                        player.NetworkColor.Value = Color.blue; // Cambiar la variable a sincronizar a Azul
-                        player.ChangeColor(Color.blue); // Cambiar el color al avatar del servidor
-                    }
-                }
-                if (GUILayout.Button("Quitar vida")) // Muestra un boton con el texto azul
-                {
-                    // Se ejecuta cuando se pulsa el boton
-                    var players = GameObject.FindObjectsOfType<Player>(); // Devuelve un array con los componentes
-                    var playersGameObjects = GameObject.FindGameObjectsWithTag("Player"); // Devuelve un array con los GameObjects
-                    for (int i = 0; i < players.Length; i++)
-                    {
-                        var player = players[i];
-                        int cantidad = Random.Range(10, 100);
-                        // 5º El servidor hace el cambio en la NetworkVariable
-                        player.QuitarVida(cantidad); // Cambiar el color al avatar del servidor
-                    }
-                }
-            }
-        }
 
+            // --- BOTONES DEL SERVIDOR (Para Debug y Pruebas) ---
+            if (NetworkManager.Singleton.IsServer)
+            {
+                // Botón para cambiar color (Ejemplo simple, no asigna únicos)
+                if (GUILayout.Button("Color Azul (Todos)"))
+                {
+                    var players = FindObjectsOfType<Player>();
+                    foreach (var player in players)
+                    {
+                        if (player != null) player.NetworkColor.Value = Color.blue;
+                    }
+                }
+                 if (GUILayout.Button("Color Rojo (Todos)"))
+                {
+                    var players = FindObjectsOfType<Player>();
+                    foreach (var player in players)
+                    {
+                        if (player != null) player.NetworkColor.Value = Color.red;
+                    }
+                }
+
+                // Botón para quitar vida
+                if (GUILayout.Button("Quitar Vida (Todos)"))
+                {
+                    var players = FindObjectsOfType<Player>();
+                    foreach (var player in players)
+                    {
+                         if (player != null)
+                         {
+                            int cantidad = Random.Range(10, 30);
+                            player.QuitarVida(cantidad); // Llama al método público en Player
+                         }
+                    }
+                }
+
+                // Botón de ejemplo para forzar respawn (si implementas respawn manual)
+                /*
+                if (GUILayout.Button("Forzar Respawn (Muertos)")) {
+                     var players = FindObjectsOfType<Player>();
+                     foreach (var player in players) {
+                          if (player != null && player.IsDead.Value) {
+                              // Suponiendo que tienes un método público RespawnNow() o similar
+                              // player.RespawnNow();
+                          }
+                     }
+                }
+                */
+            }
+            // --- FIN BOTONES SERVIDOR ---
+
+            // --- BOTONES DEL CLIENTE (Opciones Locales/Debug) ---
+             if (NetworkManager.Singleton.IsClient) {
+                 // Podríamos añadir botones para que el cliente fuerce RPCs si queremos testear
+                 // ej. GUILayout.Button("Test Disparo") -> GetLocalPlayer().SubmitFire...
+             }
+            // --- FIN BOTONES CLIENTE ---
+        }
         GUILayout.EndArea();
     }
 
-    // Cada boton inicia un tipo de servicio en el ordenador
+    // Botones de Conexión
     static void StartButtons()
     {
-        if (GUILayout.Button("Host")) NetworkManager.Singleton.StartHost();
-        if (GUILayout.Button("Client")) NetworkManager.Singleton.StartClient();
+        // --- IMPORTANTE: Usar Server y Client separados, NO Host ---
+        // if (GUILayout.Button("Host (No Usar)")) NetworkManager.Singleton.StartHost();
         if (GUILayout.Button("Server")) NetworkManager.Singleton.StartServer();
+        if (GUILayout.Button("Client")) NetworkManager.Singleton.StartClient();
     }
 
-    // Muestra el estado del servicio multijugador
-    static void StatusLabels()
+    // Etiquetas de Estado
+    void StatusLabels() // Quitar static para acceder a localClientId
     {
-        var mode = NetworkManager.Singleton.IsHost ?
-            "Host" : NetworkManager.Singleton.IsServer ? "Server" : "Client";
+        var mode = NetworkManager.Singleton.IsHost ? "Host (No Recomendado)" :
+                   NetworkManager.Singleton.IsServer ? "Server" : "Client";
 
-        GUILayout.Label("Transport: " +
-            NetworkManager.Singleton.NetworkConfig.NetworkTransport.GetType().Name);
+        GUILayout.Label("Transport: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport.GetType().Name);
         GUILayout.Label("Mode: " + mode);
-    }
 
-    // Peticion de movimiento para el jugador
-    static void SubmitNewPosition()
-    {
-        if (GUILayout.Button(NetworkManager.Singleton.IsServer ? "Move" : "Request Position Change"))
-        {
-            var playerObject = NetworkManager.Singleton.SpawnManager.GetLocalPlayerObject();
-            var player = playerObject.GetComponent<Player>();
-            player.Move();
+        // Mostrar ID del cliente local si es aplicable
+        if (NetworkManager.Singleton.IsClient) {
+             if (localClientId != ulong.MaxValue) {
+                GUILayout.Label("My Client ID: " + localClientId);
+             } else {
+                 GUILayout.Label("Connecting...");
+             }
         }
+         // Mostrar número de clientes conectados si somos servidor
+         if (NetworkManager.Singleton.IsServer) {
+             GUILayout.Label("Clients Connected: " + NetworkManager.Singleton.ConnectedClients.Count);
+         }
     }
 }
