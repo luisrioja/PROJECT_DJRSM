@@ -5,20 +5,20 @@ using System.Collections.Generic; // Necesario para List<>
 
 public class PowerUpManager : NetworkBehaviour
 {
-    [Header("Configuración de Spawn")]
+    [Header("ConfiguraciÃ³n de Spawn")]
     [Tooltip("Lista de posibles prefabs de PowerUp a instanciar. Deben tener PowerUp.cs y NetworkObject.")]
     [SerializeField] private List<GameObject> powerUpPrefabs = new List<GameObject>();
 
     [Tooltip("Lista de Transforms que marcan las posiciones donde pueden aparecer los PowerUps.")]
     [SerializeField] private List<Transform> spawnPoints = new List<Transform>();
 
-    [Tooltip("Número máximo de PowerUps activos simultáneamente en el mapa.")]
+    [Tooltip("NÃºmero mÃ¡ximo de PowerUps activos simultÃ¡neamente en el mapa.")]
     [SerializeField] private int maxPowerUps = 5;
 
     [Tooltip("Tiempo en segundos entre intentos de spawn de un nuevo PowerUp si hay espacio.")]
     [SerializeField] private float spawnInterval = 10.0f;
 
-    [Tooltip("Distancia mínima requerida entre un punto de spawn y cualquier PowerUp existente para considerarlo 'libre'.")]
+    [Tooltip("Distancia mÃ­nima requerida entre un punto de spawn y cualquier PowerUp existente para considerarlo 'libre'.")]
     [SerializeField] private float minSpawnDistance = 2.0f; // Evita spawns superpuestos
 
     // Lista interna para rastrear los PowerUps activos (solo en el servidor)
@@ -36,14 +36,14 @@ public class PowerUpManager : NetworkBehaviour
         // --- Validaciones Iniciales ---
         if (spawnPoints == null || spawnPoints.Count == 0)
         {
-            Debug.LogError("PowerUpManager: ¡No hay puntos de spawn ('Spawn Points') asignados en el Inspector!");
+            Debug.LogError("PowerUpManager: Â¡No hay puntos de spawn ('Spawn Points') asignados en el Inspector!");
             enabled = false; // Desactivar script si no puede funcionar.
             return;
         }
 
         if (powerUpPrefabs == null || powerUpPrefabs.Count == 0)
         {
-            Debug.LogError("PowerUpManager: ¡La lista de prefabs de PowerUp ('Power Up Prefabs') está vacía o no asignada!");
+            Debug.LogError("PowerUpManager: Â¡La lista de prefabs de PowerUp ('Power Up Prefabs') estÃ¡ vacÃ­a o no asignada!");
             enabled = false;
             return;
         }
@@ -55,23 +55,23 @@ public class PowerUpManager : NetworkBehaviour
             GameObject prefab = powerUpPrefabs[i];
             if (prefab == null)
             {
-                Debug.LogError($"PowerUpManager: ¡Hay una entrada NULA en la lista 'Power Up Prefabs' en el índice {i}!");
+                Debug.LogError($"PowerUpManager: Â¡Hay una entrada NULA en la lista 'Power Up Prefabs' en el Ã­ndice {i}!");
                 validationFailed = true;
-                continue; // Continuar revisando los demás
+                continue; // Continuar revisando los demÃ¡s
             }
             if (prefab.GetComponent<NetworkObject>() == null)
             {
-                 Debug.LogError($"PowerUpManager: El prefab '{prefab.name}' (índice {i}) en la lista NO tiene el componente NetworkObject requerido.");
+                 Debug.LogError($"PowerUpManager: El prefab '{prefab.name}' (Ã­ndice {i}) en la lista NO tiene el componente NetworkObject requerido.");
                  validationFailed = true;
             }
             if (prefab.GetComponent<PowerUp>() == null)
              {
-                 Debug.LogError($"PowerUpManager: El prefab '{prefab.name}' (índice {i}) en la lista NO tiene el componente PowerUp requerido.");
+                 Debug.LogError($"PowerUpManager: El prefab '{prefab.name}' (Ã­ndice {i}) en la lista NO tiene el componente PowerUp requerido.");
                  validationFailed = true;
             }
         }
         if (validationFailed) {
-            enabled = false; // Desactivar si alguna validación falló
+            enabled = false; // Desactivar si alguna validaciÃ³n fallÃ³
             return;
         }
         // --- Fin Validaciones ---
@@ -79,7 +79,7 @@ public class PowerUpManager : NetworkBehaviour
 
         activePowerUps = new List<NetworkObject>(); // Inicializar la lista de seguimiento
 
-        // Iniciar el bucle de spawn si el intervalo es válido.
+        // Iniciar el bucle de spawn si el intervalo es vÃ¡lido.
         if (spawnInterval > 0)
         {
             StartCoroutine(SpawnLoop());
@@ -87,7 +87,7 @@ public class PowerUpManager : NetworkBehaviour
         }
         else
         {
-            Debug.LogWarning("PowerUpManager: Intervalo de spawn es <= 0. No habrá spawn automático.");
+            Debug.LogWarning("PowerUpManager: Intervalo de spawn es <= 0. No habrÃ¡ spawn automÃ¡tico.");
         }
     }
 
@@ -102,7 +102,7 @@ public class PowerUpManager : NetworkBehaviour
 
 
     // =========================================
-    // --- Lógica de Spawn (Solo Servidor) ---
+    // --- LÃ³gica de Spawn (Solo Servidor) ---
     // =========================================
 
     private IEnumerator SpawnLoop()
@@ -132,7 +132,7 @@ public class PowerUpManager : NetworkBehaviour
         GameObject prefabToSpawn = powerUpPrefabs[randomIndex];
 
         if (prefabToSpawn == null) {
-            Debug.LogError($"PowerUpManager: ¡El prefab aleatorio seleccionado (índice {randomIndex}) es NULL! Saltando spawn.");
+            Debug.LogError($"PowerUpManager: Â¡El prefab aleatorio seleccionado (Ã­ndice {randomIndex}) es NULL! Saltando spawn.");
             return;
         }
 
@@ -145,8 +145,7 @@ public class PowerUpManager : NetworkBehaviour
             netObj.Spawn(true);
             activePowerUps.Add(netObj);
 
-            // --- CORRECCIÓN DEL ERROR AQUÍ ---
-            // Obtener el tipo del script PowerUp usando la variable pública 'Type'
+            // Obtener el tipo del script PowerUp usando la variable pÃºblica 'Type'
             PowerUp puScript = powerUpInstance.GetComponent<PowerUp>();
             string puTypeString = "TipoDesconocido"; // Valor por defecto
             if (puScript != null)
@@ -156,13 +155,12 @@ public class PowerUpManager : NetworkBehaviour
             else {
                  Debug.LogWarning($"PowerUpManager: El prefab instanciado '{prefabToSpawn.name}' no tiene el script PowerUp para obtener el tipo.");
             }
-             // --- FIN CORRECCIÓN ---
 
             Debug.Log($"PowerUpManager: Spawneado '{prefabToSpawn.name}' (Tipo: {puTypeString}) en {spawnPoint.name}. Total activos: {activePowerUps.Count}/{maxPowerUps}");
         }
         else
         {
-            Debug.LogError($"PowerUpManager: ¡El prefab instanciado '{prefabToSpawn.name}' no tiene NetworkObject! Destruyendo instancia local.");
+            Debug.LogError($"PowerUpManager: Â¡El prefab instanciado '{prefabToSpawn.name}' no tiene NetworkObject! Destruyendo instancia local.");
             Destroy(powerUpInstance);
         }
     }
@@ -177,7 +175,7 @@ public class PowerUpManager : NetworkBehaviour
     }
 
     // =========================================
-    // --- Métodos Auxiliares (Solo Servidor) ---
+    // --- MÃ©todos Auxiliares (Solo Servidor) ---
     // =========================================
 
     private Transform GetAvailableSpawnPoint()
@@ -212,11 +210,7 @@ public class PowerUpManager : NetworkBehaviour
     private void CleanUpDespawnedPowerUps()
     {
         int removedCount = activePowerUps.RemoveAll(item => item == null || !item.IsSpawned);
-        // Log opcional:
-        // if (removedCount > 0)
-        // {
-        //     Debug.Log($"PowerUpManager: Limpiados {removedCount} PowerUps recogidos/destruidos. Total activos: {activePowerUps.Count}/{maxPowerUps}");
-        // }
+
     }
 
     private void ShuffleList<T>(List<T> list)
