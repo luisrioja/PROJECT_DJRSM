@@ -185,7 +185,7 @@ public class Player : NetworkBehaviour
     
     /// Se llama cuando el NetworkObject asociado a este script es spawneado en la red.
     /// Es el punto principal para inicializaciones relacionadas con la red y específicas del propietario.
-    /// </summary>
+    
     public override void OnNetworkSpawn()
     {
         // Cachear componentes esenciales locales.
@@ -252,7 +252,7 @@ public class Player : NetworkBehaviour
             // Configurar la interfaz de usuario local (texto de vida).
             SetupLocalUI();
 
-            // NOTA: La solicitud de datos iniciales (color/spawn) ahora la gestiona GameManager al conectar.
+            
         }
         else // Este script pertenece a un jugador remoto.
         {
@@ -285,7 +285,7 @@ public class Player : NetworkBehaviour
 
     
     /// Se llama cada frame. Usado principalmente para leer input local (si IsOwner).
-    /// </summary>
+    
     void Update()
     {
         // Ignorar si no somos el propietario, estamos muertos o realizando un dash.
@@ -339,7 +339,7 @@ public class Player : NetworkBehaviour
     
     /// Se llama cuando el NetworkObject es despawneado o destruido.
     /// Importante para desuscribirse de eventos y limpiar referencias.
-    /// </summary>
+    
     public override void OnNetworkDespawn()
     {
         // Desuscribirse de eventos de NetworkVariables para evitar memory leaks o errores.
@@ -370,7 +370,7 @@ public class Player : NetworkBehaviour
 
     
     /// Configura la interfaz de usuario específica para el jugador local (ej. texto de vida).
-    /// </summary>
+    
     private void SetupLocalUI()
     {
         var vidaPlayerObject = GameObject.Find("VidaPlayer"); // Busca por nombre, requiere objeto en escena.
@@ -383,7 +383,7 @@ public class Player : NetworkBehaviour
 
     
     /// Configura la barra de vida flotante para avatares remotos.
-    /// </summary>
+    
     private void SetupFloatingHealthBar()
     {
         if (healthBarPrefab != null && healthBarAnchor != null) {
@@ -397,7 +397,7 @@ public class Player : NetworkBehaviour
 
      
      /// Verifica si NetworkTransform está configurado como Server Authoritative.
-     /// </summary>
+     
      private void VerifyNetworkTransformConfig() {
         var networkTransform = GetComponent<NetworkTransform>();
         if (networkTransform == null) Debug.LogError($"Player {OwnerClientId}: NetworkTransform no encontrado.");
@@ -416,7 +416,7 @@ public class Player : NetworkBehaviour
 
     
     /// Callback para cambios en NetworkSalud. Actualiza la UI correspondiente.
-    /// </summary>
+    
     private void OnHealthChanged(int previousValue, int newValue)
     {
         // Actualiza UI local si somos el dueño, o la barra flotante si es un jugador remoto.
@@ -426,7 +426,7 @@ public class Player : NetworkBehaviour
 
     
     /// Callback para cambios en NetworkColor. Actualiza el color visual del avatar.
-    /// </summary>
+    
     private void ColorChanged(Color previousValue, Color newValue)
     {
         if (playerMeshRenderer != null)
@@ -438,7 +438,7 @@ public class Player : NetworkBehaviour
 
     
     /// Callback para cambios en IsDead. Gestiona el estado visual y físico de muerte/respawn.
-    /// </summary>
+    
     private void OnIsDeadChanged(bool previousValue, bool newValue)
     {
         bool justDied = newValue && !previousValue;    // Transición de vivo a muerto.
@@ -504,7 +504,7 @@ public class Player : NetworkBehaviour
     // --- NUEVO CALLBACK para Rotación Vertical ---
     
     /// Callback para cambios en networkVerticalRotation. Llamado en clientes no-servidores.
-    /// </summary>
+    
     private void HandleVerticalRotationChanged(float previousValue, float newValue)
     {
         // Llama al método en PlayerLook para aplicar la rotación al cameraHolder local.
@@ -521,14 +521,14 @@ public class Player : NetworkBehaviour
 
     
     /// Actualiza el texto de la UI local con la vida actual.
-    /// </summary>
+    
     private void UpdateLocalHealthUI(int currentHealth) {
         if (textoVida != null) textoVida.text = "HEALTH: " + currentHealth.ToString();
     }
 
     
     /// Actualiza el valor del slider de la barra de vida flotante (como porcentaje).
-    /// </summary>
+    
     private void UpdateFloatingHealthBar(int currentHealth) {
         if (healthBarSlider != null) healthBarSlider.value = (float)currentHealth / maxHealth; // Calcula porcentaje.
         // Asegurar que la barra esté visible solo si el jugador está vivo.
@@ -544,7 +544,7 @@ public class Player : NetworkBehaviour
     
     /// [ServerRpc] Opcional. Solicitud inicial de datos desde el cliente.
     /// La asignación de color/spawn la maneja GameManager al conectar.
-    /// </summary>
+    
     [ServerRpc]
     private void RequestInitialDataServerRpc(ServerRpcParams rpcParams = default)
     {
@@ -555,7 +555,7 @@ public class Player : NetworkBehaviour
 
     
     /// [ServerRpc] Recibe la dirección de movimiento normalizada desde el cliente y mueve el avatar en el servidor.
-    /// </summary>
+    
     [ServerRpc]
     void SubmitMovementRequestServerRpc(Vector3 direction, ServerRpcParams rpcParams = default)
     {
@@ -579,7 +579,7 @@ public class Player : NetworkBehaviour
     
     /// [ServerRpc] Recibe el delta del input del ratón desde el cliente propietario.
     /// Ejecuta la lógica de rotación en el servidor.
-    /// </summary>
+    
     [ServerRpc]
     public void UpdateLookInputServerRpc(float mouseXDelta, float mouseYDelta, ServerRpcParams rpcParams = default)
     {
@@ -614,7 +614,7 @@ public class Player : NetworkBehaviour
 
     
     /// [ServerRpc] Recibe la petición de disparo, instancia y hace spawn de la bala en el servidor.
-    /// </summary>
+    
     [ServerRpc]
     void SubmitFireRequestServerRpc(Vector3 spawnPos, Quaternion spawnRot, ServerRpcParams rpcParams = default)
     {
@@ -662,7 +662,7 @@ public class Player : NetworkBehaviour
 
      
     /// [ServerRpc] Recibe petición de interacción (tecla E). Busca puertas cercanas y las activa.
-    /// </summary>
+    
     [ServerRpc]
     void SubmitInteractionRequestServerRpc(ServerRpcParams rpcParams = default)
     {
@@ -708,7 +708,7 @@ public class Player : NetworkBehaviour
 
      
     /// [ServerRpc] Recibe petición de dash, ejecuta la corutina de movimiento y notifica a clientes.
-    /// </summary>
+    
     [ServerRpc]
     void SubmitDashRequestServerRpc(Vector3 direction)
     {
@@ -729,7 +729,7 @@ public class Player : NetworkBehaviour
 
      
     /// [ClientRpc] Teletransporta forzosamente al cliente propietario a una posición. Útil para spawn inicial.
-    /// </summary>
+    
     [ClientRpc]
     private void TeleportClientRpc(Vector3 position, ClientRpcParams rpcParams = default)
     {
@@ -742,7 +742,7 @@ public class Player : NetworkBehaviour
 
      
     /// [ClientRpc] Muestra el efecto visual del dash en todos los clientes.
-    /// </summary>
+    
     [ClientRpc]
     void NotifyDashClientRpc(Vector3 direction)
     {
@@ -756,7 +756,7 @@ public class Player : NetworkBehaviour
      
     /// [ClientRpc] Notifica al cliente propietario que ha recogido un power-up.
     /// Inicia la lógica local para feedback visual y de UI.
-    /// </summary>
+    
     [ClientRpc]
     private void NotifyPowerUpPickupClientRpc(PowerUpType type, ClientRpcParams clientRpcParams = default)
     {
@@ -777,7 +777,7 @@ public class Player : NetworkBehaviour
      
     /// Aplica daño a este jugador. Solo se ejecuta si es llamado en el servidor.
     /// Ignora daño si el jugador está muerto o haciendo dash (invulnerable).
-    /// </summary>
+    
     /// <param name="amount">Cantidad de daño a aplicar.</param>
     public void TakeDamage(int amount)
     {
@@ -797,7 +797,7 @@ public class Player : NetworkBehaviour
      
     /// Lógica ejecutada en el servidor cuando la vida del jugador llega a 0.
     /// Marca al jugador como muerto (IsDead.Value = true).
-    /// </summary>
+    
     private void Die()
     {
         // Doble chequeo de seguridad.
@@ -814,7 +814,7 @@ public class Player : NetworkBehaviour
 
      
     /// Corutina de ejemplo para un temporizador de respawn (no usada actualmente).
-    /// </summary>
+    
     private IEnumerator RespawnTimer(float delay) {
          yield return new WaitForSeconds(delay);
          Respawn(); // Llamar a la lógica de respawn después del retraso.
@@ -824,7 +824,7 @@ public class Player : NetworkBehaviour
     /// Lógica ejecutada en el servidor para revivir al jugador.
     /// Restaura la salud, desmarca IsDead y lo reposiciona.
     /// Necesita ser llamada externamente (ej. por GameManager o input).
-    /// </summary>
+    
     public void Respawn() { // Hecho público para poder llamarlo externamente
         // Solo el servidor puede revivir.
         if (!IsServer) return;
@@ -855,7 +855,7 @@ public class Player : NetworkBehaviour
      
     /// Método público para compatibilidad con el botón "Quitar Vida" del NetworkHUD.
     /// Redirige a TakeDamage asegurando que solo el servidor procese el daño.
-    /// </summary>
+    
     public void QuitarVida(int cantidad) {
         // Asegurarse de que solo el servidor ejecute el TakeDamage
         if (IsServer) TakeDamage(cantidad);
@@ -872,7 +872,7 @@ public class Player : NetworkBehaviour
      
     /// Método llamado por PowerUp.cs en el SERVIDOR cuando este jugador recoge un power-up.
     /// Centraliza la lógica del servidor y el envío del RPC al cliente propietario.
-    /// </summary>
+    
     /// <param name="type">El tipo de PowerUp recogido.</param>
     public void ServerHandlePowerUpPickup(PowerUpType type)
     {
@@ -892,7 +892,7 @@ public class Player : NetworkBehaviour
      
     /// Aplica el efecto del power-up en las variables/estado del SERVIDOR.
     /// Para efectos de duración (Speed, FireRate), inicia una corutina en el servidor.
-    /// </summary>
+    
     private void ApplyPowerUpEffectOnServer(PowerUpType type)
     {
         if (!IsServer) return; // Seguridad extra.
@@ -917,7 +917,7 @@ public class Player : NetworkBehaviour
      
     /// Corutina ejecutada en el SERVIDOR para manejar la duración de los power-ups Speed y FireRate.
     /// Modifica temporalmente las variables 'moveSpeed' o 'fireRate'.
-    /// </summary>
+    
     private IEnumerator ServerPowerUpDuration(PowerUpType type, float duration)
     {
         // Aplicar el efecto al inicio de la corutina.
@@ -943,7 +943,7 @@ public class Player : NetworkBehaviour
 
      
     /// Corutina ejecutada en el CLIENTE PROPIETARIO para manejar los efectos VISUALES locales y su duración.
-    /// </summary>
+    
     private IEnumerator HandlePowerUpEffectLocal(PowerUpType type)
     {
         GameObject visualEffectInstance = null;
@@ -983,7 +983,7 @@ public class Player : NetworkBehaviour
 
      
     /// Corutina ejecutada en el CLIENTE PROPIETARIO para revertir los efectos VISUALES locales después de la duración.
-    /// </summary>
+    
     private IEnumerator RevertPowerUpEffectLocal(PowerUpType type, float duration, ActivePowerUp trackingInfo)
     {
         // Esperar si hay duración.
@@ -1004,7 +1004,7 @@ public class Player : NetworkBehaviour
       
      /// Detiene todas las corutinas de duración de power-ups locales y desactiva sus efectos visuales.
      /// Llamado al morir o al despawnear.
-     /// </summary>
+     
      private void StopAllPowerupCoroutinesAndVisuals() {
          // Solo el propietario tiene efectos locales que gestionar.
          if (!IsOwner) return;
@@ -1030,7 +1030,7 @@ public class Player : NetworkBehaviour
     /// Corutina ejecutada en el SERVIDOR para realizar el movimiento rápido del dash.
     /// Incluye detección de colisiones simple para evitar atravesar paredes.
     /// Marca al jugador como 'isDashing' temporalmente (podría usarse para invulnerabilidad).
-    /// </summary>
+    
     private IEnumerator PerformDashServer(Vector3 direction) {
          // Solo el servidor ejecuta la lógica de movimiento real.
          if (!IsServer) yield break;
