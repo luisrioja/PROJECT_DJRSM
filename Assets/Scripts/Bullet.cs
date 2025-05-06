@@ -6,11 +6,11 @@ using System.Collections; // Necesario para Coroutine
 [RequireComponent(typeof(NetworkObject))]
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(Collider))]
-[RequireComponent(typeof(NetworkRigidbody))] // O NetworkTransform si prefieres
+[RequireComponent(typeof(NetworkRigidbody))] 
 public class Bullet : NetworkBehaviour
 {
     [Header("Configuración")]
-    [SerializeField] private float speed = 50f; // Ajusta según necesidad
+    [SerializeField] private float speed = 50f; 
     [SerializeField] private int damage = 10;
     [SerializeField] private float lifeTime = 5.0f;
 
@@ -61,7 +61,7 @@ public class Bullet : NetworkBehaviour
             // Autodestrucción programada
             Invoke(nameof(DestroySelf), lifeTime);
 
-            // --- ¡¡INICIAR COROUTINE PARA APLICAR VELOCIDAD!! ---
+            
             // No aplicar velocidad directamente aquí, esperar un frame.
             StartCoroutine(ApplyInitialVelocityAfterSpawn());
             // --- FIN INICIO COROUTINE ---
