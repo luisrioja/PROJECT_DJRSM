@@ -7,19 +7,19 @@ public class GameManager : NetworkBehaviour
 {
     public static GameManager Instance { get; private set; } // Singleton simple
 
-    [Header("ConfiguraciÛn de Inicio")]
-    [SerializeField] private List<Transform> spawnPoints = new List<Transform>(); // Asignar transforms vacÌos en el editor
+    [Header("Configuraci√≥n de Inicio")]
+    [SerializeField] private List<Transform> spawnPoints = new List<Transform>(); // Asignar transforms vac√≠os en el editor
     [SerializeField] private List<Color> playerColors = new List<Color>();     // Definir colores en el editor
 
     // Listas para llevar la cuenta de lo disponible (solo en el servidor)
     private List<int> availableSpawnIndices = new List<int>();
     private List<int> availableColorIndices = new List<int>();
 
-    private Dictionary<ulong, int> clientColorMap = new Dictionary<ulong, int>(); // Para saber quÈ color tiene cada cliente
+    private Dictionary<ulong, int> clientColorMap = new Dictionary<ulong, int>(); // Para saber qu√© color tiene cada cliente
 
     private void Awake()
     {
-        // ImplementaciÛn b·sica de Singleton
+        // Implementaci√≥n b√°sica de Singleton
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -37,13 +37,13 @@ public class GameManager : NetworkBehaviour
         {
             // Los clientes no gestionan esto, solo reciben datos.
             // Desactivar el componente si no somos el servidor para ahorrar recursos.
-            // enabled = false; // Ojo: Awake todavÌa se ejecuta. Mejor poner lÛgica en Start o controlar con IsServer.
+            // enabled = false; // Ojo: Awake todav√≠a se ejecuta. Mejor poner l√≥gica en Start o controlar con IsServer.
             return;
         }
 
         Debug.Log("GameManager (Servidor): Inicializando...");
 
-        // Inicializar listas de Ìndices disponibles en el servidor
+        // Inicializar listas de √≠ndices disponibles en el servidor
         availableSpawnIndices.Clear();
         for (int i = 0; i < spawnPoints.Count; i++)
         {
@@ -56,13 +56,13 @@ public class GameManager : NetworkBehaviour
             availableColorIndices.Add(i);
         }
 
-        // Suscribirse a la conexiÛn de clientes
+        // Suscribirse a la conexi√≥n de clientes
         NetworkManager.Singleton.OnClientConnectedCallback += HandleClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback += HandleClientDisconnected;
 
         // Opcional: Asignar datos a jugadores ya conectados si el GameManager spawnea tarde
         foreach (var kvp in NetworkManager.Singleton.ConnectedClients) {
-             if (kvp.Value.PlayerObject != null) { // Asegurarse que el jugador ya spawneÛ
+             if (kvp.Value.PlayerObject != null) { // Asegurarse que el jugador ya spawne√≥
                  AssignDataToPlayer(kvp.Key);
              }
         }
@@ -96,16 +96,13 @@ public class GameManager : NetworkBehaviour
     {
         // Se ejecuta en el servidor cuando un cliente se desconecta
         Debug.Log($"GameManager (Servidor): Cliente {clientId} desconectado. Liberando recursos.");
-        // Liberar el color y spawn point si es necesario (implementaciÛn simple)
+        // Liberar el color y spawn point si es necesario (implementaci√≥n simple)
          if (clientColorMap.TryGetValue(clientId, out int colorIndex)) {
              if (!availableColorIndices.Contains(colorIndex)) { // Solo si no estaba ya libre
                  availableColorIndices.Add(colorIndex);
              }
              clientColorMap.Remove(clientId);
          }
-         // Nota: Liberar spawn points es m·s complejo si no mapeamos cliente a spawn point.
-         // Una soluciÛn simple es no liberarlos y esperar a que haya hueco.
-         // Para liberarlos, necesitarÌamos un Dictionary<ulong, int> para spawn points tambiÈn.
     }
 
     private void AssignDataToPlayer(ulong clientId)
@@ -115,9 +112,9 @@ public class GameManager : NetworkBehaviour
         // Esperar a que el objeto del jugador exista
         NetworkObject playerNetworkObject = NetworkManager.Singleton.ConnectedClients[clientId].PlayerObject;
         if (playerNetworkObject == null) {
-             Debug.LogWarning($"GameManager (Servidor): PlayerObject para cliente {clientId} a˙n no est· listo. Se reintentar·.");
-             // PodrÌamos usar una corutina para reintentar, o esperar al OnNetworkSpawn del Player.
-             // Por simplicidad, asumimos que el Player llamar· a RequestInitialDataServerRpc.
+             Debug.LogWarning($"GameManager (Servidor): PlayerObject para cliente {clientId} a√∫n no est√° listo. Se reintentar√°.");
+             // Podr√≠amos usar una corutina para reintentar, o esperar al OnNetworkSpawn del Player.
+             // Por simplicidad, asumimos que el Player llamar√° a RequestInitialDataServerRpc.
              return;
         }
 
@@ -128,7 +125,7 @@ public class GameManager : NetworkBehaviour
             return;
         }
 
-        // --- 1. Asignar Color ⁄nico ---
+        // --- 1. Asignar Color √önico ---
         if (availableColorIndices.Count > 0)
         {
             int randomIndex = Random.Range(0, availableColorIndices.Count);
@@ -137,15 +134,15 @@ public class GameManager : NetworkBehaviour
 
             playerScript.NetworkColor.Value = playerColors[colorIndex];
             clientColorMap[clientId] = colorIndex; // Guardar mapeo
-            Debug.Log($"GameManager (Servidor): Asignado color {playerColors[colorIndex]} (Ìndice {colorIndex}) a cliente {clientId}");
+            Debug.Log($"GameManager (Servidor): Asignado color {playerColors[colorIndex]} (√≠ndice {colorIndex}) a cliente {clientId}");
         }
         else
         {
-            Debug.LogWarning($"GameManager (Servidor): No hay m·s colores disponibles para cliente {clientId}. Usando color por defecto.");
+            Debug.LogWarning($"GameManager (Servidor): No hay m√°s colores disponibles para cliente {clientId}. Usando color por defecto.");
             playerScript.NetworkColor.Value = Color.white; // Color por defecto
         }
 
-        // --- 2. Asignar PosiciÛn de Spawn ⁄nica ---
+        // --- 2. Asignar Posici√≥n de Spawn √önica ---
         if (availableSpawnIndices.Count > 0)
         {
             int randomIndex = Random.Range(0, availableSpawnIndices.Count);
@@ -153,22 +150,22 @@ public class GameManager : NetworkBehaviour
             availableSpawnIndices.RemoveAt(randomIndex); // Quitarlo de disponibles
 
             Vector3 spawnPosition = spawnPoints[spawnIndex].position;
-            // Mover el jugador en el servidor (NetworkTransform sincronizar·)
+            // Mover el jugador en el servidor (NetworkTransform sincronizar√°)
             playerNetworkObject.transform.position = spawnPosition;
-            playerNetworkObject.transform.rotation = spawnPoints[spawnIndex].rotation; // TambiÈn la rotaciÛn
+            playerNetworkObject.transform.rotation = spawnPoints[spawnIndex].rotation; // Tambi√©n la rotaci√≥n
             Debug.Log($"GameManager (Servidor): Asignado spawn point {spawnIndex} ({spawnPosition}) a cliente {clientId}");
 
-            // Opcional: Forzar teletransporte en el cliente si NetworkTransform tarda
+            // Forzar teletransporte en el cliente si NetworkTransform tarda
             // playerScript.TeleportClientRpc(spawnPosition, new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } } });
         }
         else
         {
-            Debug.LogWarning($"GameManager (Servidor): No hay m·s spawn points disponibles para cliente {clientId}. Usando posiciÛn (0,1,0).");
-            playerNetworkObject.transform.position = Vector3.up; // PosiciÛn por defecto
+            Debug.LogWarning($"GameManager (Servidor): No hay m√°s spawn points disponibles para cliente {clientId}. Usando posici√≥n (0,1,0).");
+            playerNetworkObject.transform.position = Vector3.up; // Posici√≥n por defecto
         }
     }
 
-    // FunciÛn p˙blica para que otros scripts (como Bullet) obtengan el color de un jugador
+    // Funci√≥n p√∫blica para que otros scripts (como Bullet) obtengan el color de un jugador
     public Color GetPlayerColor(ulong clientId) {
          if (clientColorMap.TryGetValue(clientId, out int colorIndex)) {
              if (colorIndex >= 0 && colorIndex < playerColors.Count) {
@@ -176,11 +173,11 @@ public class GameManager : NetworkBehaviour
              }
          }
          // Devolver un color por defecto si no se encuentra
-         Debug.LogWarning($"GameManager: No se encontrÛ color asignado para cliente {clientId}. Devolviendo blanco.");
+         Debug.LogWarning($"GameManager: No se encontr√≥ color asignado para cliente {clientId}. Devolviendo blanco.");
          return Color.white;
     }
 
-     // FunciÛn para obtener un spawn point aleatorio (ej. para respawn)
+     // Funci√≥n para obtener un spawn point aleatorio (ej. para respawn)
      public Vector3 GetRandomSpawnPoint() {
          if (spawnPoints.Count == 0) return Vector3.up;
          int randomIndex = Random.Range(0, spawnPoints.Count);
