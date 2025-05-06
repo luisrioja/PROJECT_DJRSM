@@ -7,7 +7,7 @@ public class NetworkHUD : MonoBehaviour
     private ulong localClientId = ulong.MaxValue;
 
     void Start() {
-        // Suscribirse para obtener el ID del cliente cuando esté disponible
+        // Suscribirse para obtener el ID del cliente cuando estÃ© disponible
         if (NetworkManager.Singleton != null) {
              NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
              NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
@@ -23,7 +23,7 @@ public class NetworkHUD : MonoBehaviour
      }
 
     private void OnClientConnected(ulong clientId) {
-        // Comprobar si NOSOTROS somos el cliente que se conectó
+        // Comprobar si NOSOTROS somos el cliente que se conectÃ³
         if (NetworkManager.Singleton.LocalClientId == clientId) {
             localClientId = clientId;
         }
@@ -49,7 +49,7 @@ public class NetworkHUD : MonoBehaviour
             // --- BOTONES DEL SERVIDOR (Para Debug y Pruebas) ---
             if (NetworkManager.Singleton.IsServer)
             {
-                // Botón para cambiar color (Ejemplo simple, no asigna únicos)
+                // BotÃ³n para cambiar color (Ejemplo simple, no asigna Ãºnicos)
                 if (GUILayout.Button("Color Azul (Todos)"))
                 {
                     var players = FindObjectsOfType<Player>();
@@ -67,7 +67,7 @@ public class NetworkHUD : MonoBehaviour
                     }
                 }
 
-                // Botón para quitar vida
+                // BotÃ³n para quitar vida
                 if (GUILayout.Button("Quitar Vida (Todos)"))
                 {
                     var players = FindObjectsOfType<Player>();
@@ -76,29 +76,18 @@ public class NetworkHUD : MonoBehaviour
                          if (player != null)
                          {
                             int cantidad = Random.Range(10, 30);
-                            player.QuitarVida(cantidad); // Llama al método público en Player
+                            player.QuitarVida(cantidad); // Llama al mÃ©todo pÃºblico en Player
                          }
                     }
                 }
 
-                // Botón de ejemplo para forzar respawn (si implementas respawn manual)
-                /*
-                if (GUILayout.Button("Forzar Respawn (Muertos)")) {
-                     var players = FindObjectsOfType<Player>();
-                     foreach (var player in players) {
-                          if (player != null && player.IsDead.Value) {
-                              // Suponiendo que tienes un método público RespawnNow() o similar
-                              // player.RespawnNow();
-                          }
-                     }
-                }
-                */
+
             }
             // --- FIN BOTONES SERVIDOR ---
 
             // --- BOTONES DEL CLIENTE (Opciones Locales/Debug) ---
              if (NetworkManager.Singleton.IsClient) {
-                 // Podríamos añadir botones para que el cliente fuerce RPCs si queremos testear
+                 // AÃ±adir botones para que el cliente fuerce RPCs si queremos testear
                  // ej. GUILayout.Button("Test Disparo") -> GetLocalPlayer().SubmitFire...
              }
             // --- FIN BOTONES CLIENTE ---
@@ -106,11 +95,10 @@ public class NetworkHUD : MonoBehaviour
         GUILayout.EndArea();
     }
 
-    // Botones de Conexión
+    // Botones de ConexiÃ³n
     static void StartButtons()
     {
         // --- IMPORTANTE: Usar Server y Client separados, NO Host ---
-        // if (GUILayout.Button("Host (No Usar)")) NetworkManager.Singleton.StartHost();
         if (GUILayout.Button("Server")) NetworkManager.Singleton.StartServer();
         if (GUILayout.Button("Client")) NetworkManager.Singleton.StartClient();
     }
@@ -132,7 +120,7 @@ public class NetworkHUD : MonoBehaviour
                  GUILayout.Label("Connecting...");
              }
         }
-         // Mostrar número de clientes conectados si somos servidor
+         // Mostrar nÃºmero de clientes conectados si somos servidor
          if (NetworkManager.Singleton.IsServer) {
              GUILayout.Label("Clients Connected: " + NetworkManager.Singleton.ConnectedClients.Count);
          }
