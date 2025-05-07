@@ -249,9 +249,9 @@ MonoBehaviour:
   playerMeshRenderer: {fileID: 8645489298983628527}
   firePoint: {fileID: 6855597806104714708}
   bulletPrefab: {fileID: 1977768967006135689, guid: b9ba0f6d8cc072349804939205ecf2aa, type: 3}
-  bulletImpactEffectPrefab: {fileID: 0}
-  deathEffectPrefab: {fileID: 0}
-  dashEffectPrefab: {fileID: 0}
+  bulletImpactEffectPrefab: {fileID: 7452553202921276299, guid: 84d71e12a413ef547a148cc2cfa5eb86, type: 3}
+  deathEffectPrefab: {fileID: 7403103098228120956, guid: 513099c3c135b01439895582ca4ec420, type: 3}
+  dashEffectPrefab: {fileID: 8970668011737306692, guid: 286aeb44d763d664ba22fff60e040c42, type: 3}
   playerCamera: {fileID: 1228649924923276777}
   audioListener: {fileID: 651563882983310196}
   playerLookScript: {fileID: 7387846807266027062}
