@@ -124,7 +124,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2617579674
+  GlobalObjectIdHash: 2464195423
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -147,6 +147,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Type:
     m_InternalValue: 1
-  speedVisual: {fileID: 848566922745830556, guid: e30bb833b1f1fae4e845d77b402ddf64, type: 3}
-  fireRateVisual: {fileID: 8887383782444826345, guid: adb41e973431f3a40944252020bd11dc, type: 3}
-  healthVisual: {fileID: 2703503293360532592, guid: 7bb95bca401ff474b8d92ab22f25020c, type: 3}
+  speedVisual: {fileID: 8970668011737306692, guid: 286aeb44d763d664ba22fff60e040c42, type: 3}
+  fireRateVisual: {fileID: 8970668011737306692, guid: 286aeb44d763d664ba22fff60e040c42, type: 3}
+  healthVisual: {fileID: 8970668011737306692, guid: 286aeb44d763d664ba22fff60e040c42, type: 3}
