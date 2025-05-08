@@ -32,10 +32,9 @@ public class VFXManager : NetworkBehaviour
 
     // --- Client RPCs para Efectos ---
 
-    /// <summary>
+
     /// Muestra el efecto de impacto de bala en todos los clientes.
     /// Llamado por el servidor.
-    /// </summary>
     [ClientRpc]
     public void PlayBulletImpactClientRpc(Vector3 position, Vector3 normal)
     {
@@ -53,10 +52,8 @@ public class VFXManager : NetworkBehaviour
         }
     }
 
-    /// <summary>
     /// Muestra el efecto de muerte del jugador en todos los clientes.
     /// Llamado por el servidor.
-    /// </summary>
     [ClientRpc]
     public void PlayPlayerDeathClientRpc(Vector3 position, Quaternion rotation)
     {
